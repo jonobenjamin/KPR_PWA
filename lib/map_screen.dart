@@ -65,17 +65,13 @@ class _MapScreenState extends State<MapScreen> {
         _boundaryParser = GeoJsonParser(
           defaultPolygonFillColor: Colors.green.withOpacity(0.3),
           defaultPolygonBorderColor: Colors.green,
-          defaultPolygonBorderWidth: 2.0,
         );
 
-        _roadsParser = GeoJsonParser(
-          defaultLineColor: Colors.blue,
-          defaultLineWidth: 2.0,
-        );
+        _roadsParser = GeoJsonParser();
 
         // Parse the GeoJSON data
-        await _boundaryParser!.parseGeoJson(boundaryData);
-        await _roadsParser!.parseGeoJson(roadsData);
+        _boundaryParser!.parseGeoJson(boundaryData);
+        _roadsParser!.parseGeoJson(roadsData);
 
         setState(() {
           _isLoading = false;
@@ -191,7 +187,7 @@ class _MapScreenState extends State<MapScreen> {
                   markers: [
                     Marker(
                       point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                      builder: (ctx) => Container(
+                      child: Container(
                         decoration: BoxDecoration(
                           color: Colors.blue.withOpacity(0.8),
                           shape: BoxShape.circle,
