@@ -41,17 +41,20 @@ class _MapScreenState extends State<MapScreen> {
 
     try {
       // Load both boundary and roads data
+      final String apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app');
+      final String apiKey = const String.fromEnvironment('API_KEY', defaultValue: '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9');
+
       final responses = await Future.wait([
         http.get(
-          Uri.parse('${const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app')}/api/map/boundary'),
+          Uri.parse('$apiBaseUrl/api/map/boundary'),
           headers: {
-            'x-api-key': const String.fromEnvironment('API_KEY', defaultValue: '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9'),
+            'x-api-key': apiKey,
           },
         ),
         http.get(
-          Uri.parse('${const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app')}/api/map/roads'),
+          Uri.parse('$apiBaseUrl/api/map/roads'),
           headers: {
-            'x-api-key': const String.fromEnvironment('API_KEY', defaultValue: '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9'),
+            'x-api-key': apiKey,
           },
         ),
       ]);
