@@ -10,7 +10,7 @@ import 'map_screen.dart';
 
 // API Configuration - Replace with your Vercel backend URL
 const String API_BASE_URL = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app');
-const String API_KEY = String.fromEnvironment('API_KEY', defaultValue: '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9');
+const String API_KEY = String.fromEnvironment('API_KEY');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -436,6 +436,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
                 // Category expansion tile
                 ExpansionTile(
+                  key: ValueKey('category_${_isCategoryExpanded}'),
                   title: Text(_selectedCategory ?? 'Select category'),
                   leading: const Icon(Icons.category),
                   initiallyExpanded: _isCategoryExpanded,
@@ -474,6 +475,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 // Conditional expansion tiles based on category
                 if (_selectedCategory == 'Sighting') ...[
                   ExpansionTile(
+                    key: ValueKey('animal_${_isAnimalExpanded}'),
                     title: Text(_selectedAnimal ?? 'Select animal'),
                     leading: const Icon(Icons.pets),
                     initiallyExpanded: _isAnimalExpanded,
@@ -503,6 +505,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ] else if (_selectedCategory == 'Incident') ...[
                   ExpansionTile(
+                    key: ValueKey('incident_${_isIncidentExpanded}'),
                     title: Text(_selectedIncident ?? 'Type of incident'),
                     leading: const Icon(Icons.warning),
                     initiallyExpanded: _isIncidentExpanded,
@@ -532,6 +535,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ] else if (_selectedCategory == 'Maintenance') ...[
                   ExpansionTile(
+                    key: ValueKey('maintenance_${_isMaintenanceExpanded}'),
                     title: const Text('Maintenance details'),
                     leading: const Icon(Icons.build),
                     initiallyExpanded: _isMaintenanceExpanded,
