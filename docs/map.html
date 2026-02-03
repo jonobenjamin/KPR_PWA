@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wildlife Tracker Map</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        }
+
+        .legend h4 {
+            margin: 0 0 10px 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid #333;
+        }
+
+        .status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 12px;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="status" id="status">
+        <div>Loading map...</div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your actual values
+        const CONFIG = {
+            // Replace with your backend URL when deployed
+            API_BASE_URL: window.location.hostname === 'localhost'
+                ? 'http://localhost:3000'
+                : 'https://your-backend-url.vercel.app',
+
+            // API Key - This will be replaced during build with GitHub secret
+            API_KEY: '__API_KEY__',
+
+            // Map center coordinates (adjust based on your data)
+            MAP_CENTER: [-3.0, 37.5], // Approximate center of your area
+
+            // Map zoom level
+            MAP_ZOOM: 10
+        };
+
+        let map;
+        let roadsLayer;
+        let observationsLayer;
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add legend
+            addLegend();
+
+            // Load data
+            loadRoads();
+            loadObservations();
+
+            updateStatus('Map loaded successfully', 'success');
+        }
+
+        // Add legend to map
+        function addLegend() {
+            const legend = L.control({position: 'bottomright'});
+
+            legend.onAdd = function (map) {
+                const div = L.DomUtil.create('div', 'legend');
+                div.innerHTML = `
+                    <h4>Legend</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3388ff;"></div>
+                        <span>Roads</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff4444;"></div>
+                        <span>Animal Sightings</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ffaa00;"></div>
+                        <span>Incidents</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #44aa44;"></div>
+                        <span>Maintenance</span>
+                    </div>
+                `;
+                return div;
+            };
+
+            legend.addTo(map);
+        }
+
+        // Load roads GeoJSON
+        async function loadRoads() {
+            try {
+                updateStatus('Loading roads...');
+
+                const response = await fetch(`${CONFIG.API_BASE_URL}/api/map/roads?apiKey=${CONFIG.API_KEY}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const geoJson = await response.json();
+
+                roadsLayer = L.geoJSON(geoJson, {
+                    style: {
+                        color: '#3388ff',
+                        weight: 3,
+                        opacity: 0.7
+                    }
+                }).addTo(map);
+
+                // Fit map to roads bounds
+                if (roadsLayer.getBounds().isValid()) {
+                    map.fitBounds(roadsLayer.getBounds());
+                }
+
+                updateStatus('Roads loaded successfully', 'success');
+
+            } catch (error) {
+                console.error('Error loading roads:', error);
+                updateStatus(`Error loading roads: ${error.message}`, 'error');
+            }
+        }
+
+        // Load observations from Firebase
+        async function loadObservations() {
+            try {
+                updateStatus('Loading observations...');
+
+                const response = await fetch(`${CONFIG.API_BASE_URL}/api/data/observations?apiKey=${CONFIG.API_KEY}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    plotObservations(data.data);
+                    updateStatus(`${data.count} observations loaded successfully`, 'success');
+                } else {
+                    throw new Error('Invalid response format');
+                }
+
+            } catch (error) {
+                console.error('Error loading observations:', error);
+                updateStatus(`Error loading observations: ${error.message}`, 'error');
+            }
+        }
+
+        // Plot observations on map
+        function plotObservations(observations) {
+            // Clear existing observations layer
+            if (observationsLayer) {
+                map.removeLayer(observationsLayer);
+            }
+
+            observationsLayer = L.layerGroup();
+
+            observations.forEach(obs => {
+                if (obs.latitude && obs.longitude) {
+                    const marker = createObservationMarker(obs);
+                    observationsLayer.addLayer(marker);
+                }
+            });
+
+            observationsLayer.addTo(map);
+        }
+
+        // Create marker for observation
+        function createObservationMarker(observation) {
+            const { latitude, longitude, category, animal, incident_type, maintenance_type, timestamp } = observation;
+
+            // Determine marker color and icon based on category
+            let color, iconHtml;
+
+            switch (category) {
+                case 'Sighting':
+                    color = '#ff4444';
+                    iconHtml = '🐾';
+                    break;
+                case 'Incident':
+                    color = '#ffaa00';
+                    iconHtml = '⚠️';
+                    break;
+                case 'Maintenance':
+                    color = '#44aa44';
+                    iconHtml = '🔧';
+                    break;
+                default:
+                    color = '#666666';
+                    iconHtml = '📍';
+            }
+
+            // Create custom icon
+            const icon = L.divIcon({
+                html: `<div style="background: ${color}; border: 2px solid #333; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px;">${iconHtml}</div>`,
+                className: 'custom-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            // Create popup content
+            let popupContent = `<strong>${category}</strong><br>`;
+
+            if (animal) popupContent += `Animal: ${animal}<br>`;
+            if (incident_type) popupContent += `Incident: ${incident_type}<br>`;
+            if (maintenance_type) popupContent += `Maintenance: ${maintenance_type}<br>`;
+
+            popupContent += `Location: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}<br>`;
+            popupContent += `Time: ${new Date(timestamp).toLocaleString()}`;
+
+            return L.marker([latitude, longitude], { icon })
+                .bindPopup(popupContent);
+        }
+
+        // Update status display
+        function updateStatus(message, type = '') {
+            const statusEl = document.getElementById('status');
+            statusEl.innerHTML = `<div class="${type}">${message}</div>`;
+
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusEl.innerHTML = '';
+                }, 3000);
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initMap);
+
+        // Refresh data every 30 seconds
+        setInterval(() => {
+            loadObservations();
+        }, 30000);
+    </script>
+</body>
+</html>
