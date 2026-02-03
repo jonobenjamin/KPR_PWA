@@ -7,7 +7,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final Function(LatLng)? onMapTap;
+  final LatLng? selectedPoint;
+
+  const MapScreen({super.key, this.onMapTap, this.selectedPoint});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -168,6 +171,10 @@ class _MapScreenState extends State<MapScreen> {
               zoom: _initialZoom,
               minZoom: 8.0,
               maxZoom: 18.0,
+              onTap: (tapPosition, point) {
+                print('MapScreen onTap called with point: ${point.latitude}, ${point.longitude}');
+                widget.onMapTap?.call(point);
+              },
             ),
             children: [
               TileLayer(
@@ -201,6 +208,20 @@ class _MapScreenState extends State<MapScreen> {
                           color: Colors.white,
                           size: 20,
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+              // Add selected point marker
+              if (widget.selectedPoint != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: widget.selectedPoint!,
+                      child: Icon(
+                        Icons.location_pin,
+                        color: Colors.red,
+                        size: 40,
                       ),
                     ),
                   ],

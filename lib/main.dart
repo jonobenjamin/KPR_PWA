@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart'; // For GPS
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'dart:convert';
 import 'map_screen.dart';
 
@@ -52,6 +53,13 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _selectedCategory;
   String? _selectedAnimal;
   String? _selectedIncident;
+  bool _showForm = false;
+  bool _showMap = false;
+  LatLng? _selectedPoint;
+  bool _isCategoryExpanded = false;
+  bool _isAnimalExpanded = false;
+  bool _isIncidentExpanded = false;
+  bool _isMaintenanceExpanded = false;
 
   final List<String> _categories = ['Sighting', 'Incident', 'Maintenance'];
   final List<String> _animals = [
@@ -293,119 +301,369 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.map),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MapScreen()),
+          ValueListenableBuilder(
+            valueListenable: box.listenable(),
+            builder: (context, Box box, _) {
+              final unsyncedCount = box.values.where((item) => item['synced'] != true).length;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.outbox),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const OfflineDataScreen()),
+                      );
+                    },
+                    tooltip: 'View offline data (${unsyncedCount} unsynced)',
+                  ),
+                  if (unsyncedCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unsyncedCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
-            tooltip: 'View Map',
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Category dropdown
-            DropdownButton<String>(
-              value: _selectedCategory,
-              hint: const Text('Select category'),
-              isExpanded: true,
-              items: _categories
-                  .map((category) => DropdownMenuItem(
-                        value: category,
-                        child: Text(category),
-                      ))
-                  .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value;
-                  // Reset dependent fields when category changes
-                  _selectedAnimal = null;
-                  _selectedIncident = null;
-                  _maintenanceController.clear();
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Conditional UI based on category
-            if (_selectedCategory == 'Sighting') ...[
-              DropdownButton<String>(
-                value: _selectedAnimal,
-                hint: const Text('Select animal'),
-                isExpanded: true,
-                items: _animals
-                    .map((animal) => DropdownMenuItem(
-                          value: animal,
-                          child: Text(animal),
-                        ))
-                    .toList(),
-                onChanged: (value) {
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Concession Map button (always visible)
+              ElevatedButton.icon(
+                onPressed: () {
                   setState(() {
-                    _selectedAnimal = value;
+                    _showMap = !_showMap;
                   });
                 },
+                icon: Icon(_showMap ? Icons.close : Icons.map),
+                label: Text(_showMap ? 'Close Map' : 'Concession Map'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  textStyle: const TextStyle(fontSize: 16),
+                ),
               ),
-            ] else if (_selectedCategory == 'Incident') ...[
-              DropdownButton<String>(
-                value: _selectedIncident,
-                hint: const Text('Type of incident'),
-                isExpanded: true,
-                items: _incidents
-                    .map((incident) => DropdownMenuItem(
-                          value: incident,
-                          child: Text(incident),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedIncident = value;
-                  });
-                },
-              ),
-            ] else if (_selectedCategory == 'Maintenance') ...[
-              TextField(
-                controller: _maintenanceController,
-                decoration: const InputDecoration(labelText: 'Type of maintenance'),
-              ),
-            ],
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // GPS section - manual input for web, auto for mobile
-            if (kIsWeb) ...[
-              const Text('GPS Location (optional)', style: TextStyle(fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _latitudeController,
-                      decoration: const InputDecoration(labelText: 'Latitude'),
-                      keyboardType: TextInputType.number,
-                    ),
+              // Map section (appears right under map button)
+              if (_showMap) ...[
+                SizedBox(
+                  height: 400, // Fixed height for map
+                  child: MapScreen(
+                    onMapTap: (latLng) {
+                      print('Map tapped at: ${latLng.latitude}, ${latLng.longitude}');
+                      setState(() {
+                        _selectedPoint = latLng;
+                        _latitudeController.text = latLng.latitude.toStringAsFixed(6);
+                        _longitudeController.text = latLng.longitude.toStringAsFixed(6);
+                      });
+                      print('Selected point set to: $_selectedPoint');
+                    },
+                    selectedPoint: _selectedPoint,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextField(
-                      controller: _longitudeController,
-                      decoration: const InputDecoration(labelText: 'Longitude'),
-                      keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Add Data button (always visible)
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _showForm = !_showForm;
+                  });
+                },
+                icon: Icon(_showForm ? Icons.close : Icons.add),
+                label: Text(_showForm ? 'Close Form' : 'Add Data'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  textStyle: const TextStyle(fontSize: 16),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Form section (appears right under add data button)
+              if (_showForm) ...[
+                // GPS section first - manual input for web, auto for mobile
+                if (kIsWeb) ...[
+                  const Text('GPS Location (select on map)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _latitudeController,
+                          decoration: const InputDecoration(labelText: 'Latitude'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextField(
+                          controller: _longitudeController,
+                          decoration: const InputDecoration(labelText: 'Longitude'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Category expansion tile
+                ExpansionTile(
+                  title: Text(_selectedCategory ?? 'Select category'),
+                  leading: const Icon(Icons.category),
+                  initiallyExpanded: _isCategoryExpanded,
+                  onExpansionChanged: (expanded) {
+                    setState(() {
+                      _isCategoryExpanded = expanded;
+                    });
+                  },
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Column(
+                        children: [
+                          ..._categories.map((category) => ListTile(
+                            title: Text(category),
+                            onTap: () {
+                              setState(() {
+                                _selectedCategory = category;
+                                _isCategoryExpanded = false; // Close after selection
+                                // Reset dependent fields when category changes
+                                _selectedAnimal = null;
+                                _selectedIncident = null;
+                                _maintenanceController.clear();
+                                _isAnimalExpanded = false;
+                                _isIncidentExpanded = false;
+                                _isMaintenanceExpanded = false;
+                              });
+                            },
+                          )),
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+
+                // Conditional expansion tiles based on category
+                if (_selectedCategory == 'Sighting') ...[
+                  ExpansionTile(
+                    title: Text(_selectedAnimal ?? 'Select animal'),
+                    leading: const Icon(Icons.pets),
+                    initiallyExpanded: _isAnimalExpanded,
+                    onExpansionChanged: (expanded) {
+                      setState(() {
+                        _isAnimalExpanded = expanded;
+                      });
+                    },
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Column(
+                          children: [
+                            ..._animals.map((animal) => ListTile(
+                              title: Text(animal),
+                              onTap: () {
+                                setState(() {
+                                  _selectedAnimal = animal;
+                                  _isAnimalExpanded = false; // Close after selection
+                                });
+                              },
+                            )),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (_selectedCategory == 'Incident') ...[
+                  ExpansionTile(
+                    title: Text(_selectedIncident ?? 'Type of incident'),
+                    leading: const Icon(Icons.warning),
+                    initiallyExpanded: _isIncidentExpanded,
+                    onExpansionChanged: (expanded) {
+                      setState(() {
+                        _isIncidentExpanded = expanded;
+                      });
+                    },
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Column(
+                          children: [
+                            ..._incidents.map((incident) => ListTile(
+                              title: Text(incident),
+                              onTap: () {
+                                setState(() {
+                                  _selectedIncident = incident;
+                                  _isIncidentExpanded = false; // Close after selection
+                                });
+                              },
+                            )),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (_selectedCategory == 'Maintenance') ...[
+                  ExpansionTile(
+                    title: const Text('Maintenance details'),
+                    leading: const Icon(Icons.build),
+                    initiallyExpanded: _isMaintenanceExpanded,
+                    onExpansionChanged: (expanded) {
+                      setState(() {
+                        _isMaintenanceExpanded = expanded;
+                      });
+                    },
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: TextField(
+                          controller: _maintenanceController,
+                          decoration: const InputDecoration(labelText: 'Type of maintenance'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-            ],
 
             ElevatedButton(
               onPressed: _submitData,
               child: const Text('Submit'),
             ),
-            const SizedBox(height: 16),
+          ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class OfflineDataScreen extends StatefulWidget {
+  const OfflineDataScreen({super.key});
+
+  @override
+  State<OfflineDataScreen> createState() => _OfflineDataScreenState();
+}
+
+class _OfflineDataScreenState extends State<OfflineDataScreen> {
+  final Box box = Hive.box('offlineData');
+
+  Future<bool> syncOfflineData() async {
+    try {
+      print('Starting sync process...');
+
+      final unsyncedItems =
+          box.values.where((item) => item['synced'] == false).toList();
+
+      print('Found ${unsyncedItems.length} unsynced items');
+
+      if (unsyncedItems.isEmpty) {
+        print('No unsynced items to upload');
+        return true; // Nothing to sync, but that's success
+      }
+
+      // Store keys of successfully synced items to delete them later
+      List<int> syncedKeys = [];
+
+      for (var item in unsyncedItems) {
+        print('Uploading item: ${item['category']}');
+        try {
+          // Create the data to upload based on the structure
+          Map<String, dynamic> uploadData = {
+            'category': item['category'],
+            'timestamp': item['timestamp'] ?? DateTime.now().toIso8601String(),
+          };
+
+          // Add category-specific data
+          if (item['category'] == 'Sighting') {
+            uploadData['animal'] = item['animal'];
+          } else if (item['category'] == 'Incident') {
+            uploadData['incident_type'] = item['incident_type'];
+          } else if (item['category'] == 'Maintenance') {
+            uploadData['maintenance_type'] = item['maintenance_type'];
+          }
+
+          // Add GPS data if available
+          if (item['latitude'] != null && item['longitude'] != null) {
+            uploadData['latitude'] = item['latitude'];
+            uploadData['longitude'] = item['longitude'];
+          }
+
+          final String apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app');
+          final String apiKey = const String.fromEnvironment('API_KEY', defaultValue: '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9');
+
+          final response = await http.post(
+            Uri.parse('$apiBaseUrl/api/observations'),
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+            },
+            body: json.encode(uploadData),
+          );
+
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            print('Successfully uploaded item');
+            // Store the key for later deletion
+            syncedKeys.add(box.keys.toList()[box.values.toList().indexOf(item)]);
+          } else {
+            print('API upload failed with status: ${response.statusCode}');
+          }
+        } catch (e) {
+          print('Error uploading item: $e');
+        }
+      }
+
+      // Delete successfully synced items
+      for (var key in syncedKeys) {
+        await box.delete(key);
+        print('Deleted synced item with key: $key');
+      }
+
+      print('Sync process completed. Synced ${syncedKeys.length} items');
+      return syncedKeys.isNotEmpty || unsyncedItems.isEmpty;
+    } catch (e) {
+      print('Sync process failed: $e');
+      return false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Offline Data'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
             ElevatedButton(
               onPressed: () async {
                 print('Sync button pressed!');
@@ -458,6 +716,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         title: Text(title),
                         subtitle: Text(subtitle),
                         trailing: trailing,
+                        dense: true, // Make list items more compact
                       );
                     },
                   );
