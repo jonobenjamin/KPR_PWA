@@ -17,21 +17,56 @@ void main() async {
 
   await Hive.initFlutter(); // Initialize Hive
   await Hive.openBox('offlineData'); // Open offline storage box
+  await Hive.openBox('userData'); // Open user data storage box
 
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final Box userBox = Hive.box('userData');
+  bool _isLoading = true;
+  String? _selectedUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserSelection();
+  }
+
+  Future<void> _checkUserSelection() async {
+    _selectedUser = userBox.get('selectedUser');
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return MaterialApp(
-      title: 'Offline Mobile App',
+      title: 'Wildlife Tracker',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Offline Form App'),
+      home: _selectedUser != null
+          ? const MyHomePage(title: 'Wildlife Tracker')
+          : const UserSelectionScreen(),
     );
   }
 }
@@ -70,6 +105,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<String> _incidents = ['Poaching', 'Litter'];
 
   final Box box = Hive.box('offlineData');
+  final Box userBox = Hive.box('userData');
 
   // Submit data offline with GPS
   Future<void> _submitData() async {
@@ -163,22 +199,28 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     // Create data object based on category
+    // Get selected user - ensure we have a valid user
+    final Box userDataBox = Hive.box('userData');
+    final selectedUser = userDataBox.get('selectedUser') ?? 'Unknown User';
+
     Map<String, dynamic> data = {
       'category': _selectedCategory,
       'timestamp': DateTime.now().toIso8601String(),
       'synced': false,
       'latitude': latitude,
       'longitude': longitude,
+      'user': selectedUser, // Add selected user to data
     };
 
     if (_selectedCategory == 'Sighting') {
       data['animal'] = _selectedAnimal;
     } else if (_selectedCategory == 'Incident') {
       data['incident_type'] = _selectedIncident;
-    } else if (_selectedCategory == 'Maintenance') {
+    } else     if (_selectedCategory == 'Maintenance') {
       data['maintenance_type'] = _maintenanceController.text;
     }
 
+    print('DEBUG: Final data object: $data');
     box.add(data);
 
     // Clear form
@@ -569,6 +611,109 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+class UserSelectionScreen extends StatefulWidget {
+  const UserSelectionScreen({super.key});
+
+  @override
+  State<UserSelectionScreen> createState() => _UserSelectionScreenState();
+}
+
+class _UserSelectionScreenState extends State<UserSelectionScreen> {
+  final Box userBox = Hive.box('userData');
+  String? _selectedUser;
+
+  final List<String> _users = [
+    'Jonathan Benjamin',
+    'Ian le Roux',
+    'Tempe Adams',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Select User'),
+        automaticallyImplyLeading: false, // Remove back button
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.person,
+              size: 80,
+              color: Colors.deepPurple,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Welcome to Wildlife Tracker',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Please select your name to continue',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            DropdownButtonFormField<String>(
+              value: _selectedUser,
+              hint: const Text('Select your name'),
+              isExpanded: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              ),
+              items: _users.map((user) {
+                return DropdownMenuItem(
+                  value: user,
+                  child: Text(user),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedUser = value;
+                });
+              },
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: _selectedUser != null ? _saveUserAndContinue : null,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                textStyle: const TextStyle(fontSize: 18),
+              ),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _saveUserAndContinue() {
+    if (_selectedUser != null) {
+      // Save selected user to persistent storage
+      userBox.put('selectedUser', _selectedUser);
+
+      // Navigate to main app
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const MyHomePage(title: 'Wildlife Tracker'),
+        ),
+      );
+    }
+  }
+}
+
 class OfflineDataScreen extends StatefulWidget {
   const OfflineDataScreen({super.key});
 
@@ -603,6 +748,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen> {
           Map<String, dynamic> uploadData = {
             'category': item['category'],
             'timestamp': item['timestamp'] ?? DateTime.now().toIso8601String(),
+            'user': item['user'] ?? 'Unknown User', // Include user information with fallback
           };
 
           // Add category-specific data
@@ -621,7 +767,12 @@ class _OfflineDataScreenState extends State<OfflineDataScreen> {
           }
 
           final String apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app');
-          final String apiKey = const String.fromEnvironment('API_KEY', defaultValue: '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9');
+          final String apiKey = const String.fromEnvironment('API_KEY');
+
+          // Check for required environment variables
+          if (apiKey.isEmpty) {
+            throw Exception('API_KEY environment variable is required. Set it with --dart-define=API_KEY=your-key');
+          }
 
           final response = await http.post(
             Uri.parse('$apiBaseUrl/api/observations'),
@@ -703,6 +854,11 @@ class _OfflineDataScreenState extends State<OfflineDataScreen> {
                         subtitle = item['incident_type'] ?? 'Unknown incident';
                       } else if (item['category'] == 'Maintenance') {
                         subtitle = item['maintenance_type'] ?? 'Unknown maintenance';
+                      }
+
+                      // Add user info if available
+                      if (item['user'] != null) {
+                        subtitle += ' by ${item['user']}';
                       }
 
                       // Add GPS info if available

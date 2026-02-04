@@ -46,3 +46,8 @@ app.*.map.json
 
 # Firebase service account key (NEVER commit this!)
 backend/firebase-service-account.json
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.production
