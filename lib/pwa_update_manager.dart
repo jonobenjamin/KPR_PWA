@@ -22,6 +22,13 @@ class PwaUpdateManager extends ChangeNotifier {
       // Get the service worker registration
       _registration = await html.window.navigator.serviceWorker?.ready;
 
+      // Check immediately if there's already a waiting worker
+      if (_registration?.waiting != null) {
+        _updateAvailable = true;
+        notifyListeners();
+        debugPrint('Update already waiting on initialization');
+      }
+
       // Listen for updates using Flutter's service worker pattern
       _registration?.addEventListener('updatefound', (html.Event event) {
         final newWorker = _registration?.installing;
@@ -39,8 +46,20 @@ class PwaUpdateManager extends ChangeNotifier {
         }
       });
 
+      // Listen for controller change (new service worker activated)
+      html.window.navigator.serviceWorker?.addEventListener('controllerchange', (html.Event event) {
+        debugPrint('New service worker activated, checking for updates');
+        if (_registration?.waiting != null) {
+          _updateAvailable = true;
+          notifyListeners();
+        }
+      });
+
       // Also check periodically for updates
       _startPeriodicUpdateCheck();
+
+      // Do an initial update check
+      checkForUpdates();
 
       debugPrint('PWA Update Manager initialized');
     } catch (e) {

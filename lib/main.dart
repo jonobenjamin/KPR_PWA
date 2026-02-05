@@ -92,6 +92,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _selectedCategory;
   String? _selectedAnimal;
   String? _selectedIncident;
+  String? _selectedPoachingType;
   bool _showForm = false;
   bool _showMap = false;
   LatLng? _selectedPoint;
@@ -99,6 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isAnimalExpanded = false;
   bool _isIncidentExpanded = false;
   bool _isMaintenanceExpanded = false;
+  bool _isPoachingTypeExpanded = false;
 
   final List<String> _categories = ['Sighting', 'Incident', 'Maintenance'];
   final List<String> _animals = [
@@ -107,6 +109,7 @@ class _MyHomePageState extends State<MyHomePage> {
     'Spotted-necked Otter', 'Cape Clawless Otter'
   ];
   final List<String> _incidents = ['Poaching', 'Litter'];
+  final List<String> _poachingTypes = ['Carcass', 'Snare', 'Poacher'];
 
   final Box box = Hive.box('offlineData');
   final Box userBox = Hive.box('userData');
@@ -163,6 +166,13 @@ class _MyHomePageState extends State<MyHomePage> {
     if (_selectedCategory == 'Incident' && _selectedIncident == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select type of incident')),
+      );
+      return;
+    }
+
+    if (_selectedCategory == 'Incident' && _selectedIncident == 'Poaching' && _selectedPoachingType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select poaching type')),
       );
       return;
     }
@@ -252,7 +262,10 @@ class _MyHomePageState extends State<MyHomePage> {
       data['animal'] = _selectedAnimal;
     } else if (_selectedCategory == 'Incident') {
       data['incident_type'] = _selectedIncident;
-    } else     if (_selectedCategory == 'Maintenance') {
+      if (_selectedIncident == 'Poaching' && _selectedPoachingType != null) {
+        data['poaching_type'] = _selectedPoachingType;
+      }
+    } else if (_selectedCategory == 'Maintenance') {
       data['maintenance_type'] = _maintenanceController.text;
     }
 
@@ -268,6 +281,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _selectedCategory = null;
       _selectedAnimal = null;
       _selectedIncident = null;
+      _selectedPoachingType = null;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -308,6 +322,9 @@ class _MyHomePageState extends State<MyHomePage> {
             uploadData['animal'] = item['animal'];
           } else if (item['category'] == 'Incident') {
             uploadData['incident_type'] = item['incident_type'];
+            if (item['poaching_type'] != null) {
+              uploadData['poaching_type'] = item['poaching_type'];
+            }
           } else if (item['category'] == 'Maintenance') {
             uploadData['maintenance_type'] = item['maintenance_type'];
           }
@@ -489,7 +506,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   });
                 },
                 icon: Icon(_showMap ? Icons.close : Icons.map),
-                label: Text(_showMap ? 'Close Map' : 'Concession Map'),
+                label: Text(_showMap ? 'Close Map' : 'View Map'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                   textStyle: const TextStyle(fontSize: 16),
@@ -587,10 +604,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                 // Reset dependent fields when category changes
                                 _selectedAnimal = null;
                                 _selectedIncident = null;
+                                _selectedPoachingType = null;
                                 _maintenanceController.clear();
                                 _isAnimalExpanded = false;
                                 _isIncidentExpanded = false;
                                 _isMaintenanceExpanded = false;
+                                _isPoachingTypeExpanded = false;
                               });
                             },
                           )),
@@ -653,6 +672,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                 setState(() {
                                   _selectedIncident = incident;
                                   _isIncidentExpanded = false; // Close after selection
+                                  // Reset poaching type when incident type changes
+                                  if (incident != 'Poaching') {
+                                    _selectedPoachingType = null;
+                                    _isPoachingTypeExpanded = false;
+                                  }
                                 });
                               },
                             )),
@@ -661,6 +685,38 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ],
                   ),
+                  // Show poaching type dropdown if incident is Poaching
+                  if (_selectedIncident == 'Poaching') ...[
+                    ExpansionTile(
+                      key: ValueKey('poaching_${_isPoachingTypeExpanded}'),
+                      title: Text(_selectedPoachingType ?? 'Select poaching type'),
+                      leading: const Icon(Icons.warning_amber),
+                      initiallyExpanded: _isPoachingTypeExpanded,
+                      onExpansionChanged: (expanded) {
+                        setState(() {
+                          _isPoachingTypeExpanded = expanded;
+                        });
+                      },
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Column(
+                            children: [
+                              ..._poachingTypes.map((type) => ListTile(
+                                title: Text(type),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedPoachingType = type;
+                                    _isPoachingTypeExpanded = false; // Close after selection
+                                  });
+                                },
+                              )),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ] else if (_selectedCategory == 'Maintenance') ...[
                   ExpansionTile(
                     key: ValueKey('maintenance_${_isMaintenanceExpanded}'),
@@ -845,6 +901,9 @@ class _OfflineDataScreenState extends State<OfflineDataScreen> {
             uploadData['animal'] = item['animal'];
           } else if (item['category'] == 'Incident') {
             uploadData['incident_type'] = item['incident_type'];
+            if (item['poaching_type'] != null) {
+              uploadData['poaching_type'] = item['poaching_type'];
+            }
           } else if (item['category'] == 'Maintenance') {
             uploadData['maintenance_type'] = item['maintenance_type'];
           }
@@ -941,6 +1000,9 @@ class _OfflineDataScreenState extends State<OfflineDataScreen> {
                         subtitle = item['animal'] ?? 'Unknown animal';
                       } else if (item['category'] == 'Incident') {
                         subtitle = item['incident_type'] ?? 'Unknown incident';
+                        if (item['poaching_type'] != null) {
+                          subtitle += ' (${item['poaching_type']})';
+                        }
                       } else if (item['category'] == 'Maintenance') {
                         subtitle = item['maintenance_type'] ?? 'Unknown maintenance';
                       }
