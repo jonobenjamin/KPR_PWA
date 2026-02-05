@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khwai Private Reserve Monitoring Dashboard</title>
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <!-- Top Ribbon -->
+    <div class="top-ribbon">
+        <h1>Khwai Private Reserve Monitoring Dashboard</h1>
+        <a href="https://jonobenjamin.github.io/WildlifeTracker-Front_End/" target="_blank" class="submit-data-btn">
+            Submit Data
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Map Section (75% width) -->
+        <div class="map-section">
+            <div id="loading" class="loading">
+                <div>Loading map data...</div>
+            </div>
+            <div id="map"></div>
+        </div>
+
+        <!-- Sidebar (25% width) -->
+        <div class="sidebar">
+            <h3>Filters & Controls</h3>
+
+            <!-- Date Range Controls -->
+            <div class="control-group">
+                <h4>Date Range</h4>
+                <div class="date-controls">
+                    <div class="date-control">
+                        <label for="start-date">Start Date</label>
+                        <input type="date" id="start-date">
+                    </div>
+                    <div class="date-control">
+                        <label for="end-date">End Date</label>
+                        <input type="date" id="end-date">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Month/Year Selector -->
+            <div class="control-group">
+                <h4>Month & Year</h4>
+                <div class="date-controls">
+                    <div class="date-control">
+                        <label for="month-select">Month</label>
+                        <select id="month-select">
+                            <option value="">All Months</option>
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="date-control">
+                        <label for="year-select">Year</label>
+                        <input type="number" id="year-select" placeholder="2025" min="2020" max="2030">
+                    </div>
+                </div>
+            </div>
+
+            <!-- View Toggle -->
+            <div class="control-group">
+                <h4>View Mode</h4>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="sightings">Sightings</button>
+                    <button class="view-btn" data-view="maintenance">Maintenance</button>
+                    <button class="view-btn" data-view="incidents">Incidents</button>
+                </div>
+            </div>
+
+            <!-- Species Filter (Sightings only) -->
+            <div class="control-group" id="species-group" style="display: block;">
+                <h4>Species Filter</h4>
+                <div class="species-filter">
+                    <select id="species-select">
+                        <option value="">All Species</option>
+                        <option value="elephant">Elephant</option>
+                        <option value="lion">Lion</option>
+                        <option value="leopard">Leopard</option>
+                        <option value="buffalo">Buffalo</option>
+                        <option value="giraffe">Giraffe</option>
+                        <option value="zebra">Zebra</option>
+                        <option value="wild-dog">Wild Dog</option>
+                        <option value="hyena">Hyena</option>
+                        <option value="cheetah">Cheetah</option>
+                        <option value="hippo">Hippo</option>
+                    </select>
+                </div>
+
+                <!-- Stats Display -->
+                <div class="stats-display">
+                    <span class="stat-number" id="total-records">0</span>
+                    <span class="stat-label">Total Sightings</span>
+                </div>
+
+                <!-- Latest Sightings Toggle -->
+                <div class="latest-toggle">
+                    <input type="checkbox" id="latest-sightings-toggle">
+                    <label for="latest-sightings-toggle">Show Latest Sightings (This Week)</label>
+                </div>
+            </div>
+
+            <!-- Maintenance Stats -->
+            <div class="control-group" id="maintenance-group" style="display: none;">
+                <h4>Maintenance Stats</h4>
+                <div class="stats-display">
+                    <span class="stat-number" id="maintenance-records">0</span>
+                    <span class="stat-label">Total Maintenance</span>
+                </div>
+
+                <div class="latest-toggle">
+                    <input type="checkbox" id="latest-maintenance-toggle">
+                    <label for="latest-maintenance-toggle">Show Latest Maintenance</label>
+                </div>
+            </div>
+
+            <!-- Incidents Stats -->
+            <div class="control-group" id="incidents-group" style="display: none;">
+                <h4>Incidents Stats</h4>
+                <div class="stats-display">
+                    <span class="stat-number" id="incident-records">0</span>
+                    <span class="stat-label">Total Incidents</span>
+                </div>
+
+                <div class="latest-toggle">
+                    <input type="checkbox" id="latest-incidents-toggle">
+                    <label for="latest-incidents-toggle">Show Latest Incidents</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Ribbon -->
+    <div class="bottom-ribbon">
+        <p>© 2025 Khwai Private Reserve Monitoring System | Developed by <a href="mailto:jonobenjamingis@gmail.com">@jonathan Benjamin</a></p>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Simple Wildlife Tracker Map
+        // Loads local GeoJSON for boundaries/roads, fetches Firebase observations
+
+        // Configuration
+        const API_BASE_URL = 'https://wildlife-tracker-gxz5.vercel.app';
+        const API_KEY = '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9';
+
+        // Simple authentication function
+        function getAuthHeaders() {
+            return {
+                'x-api-key': API_KEY,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Initialize map
+        const map = L.map('map').setView([-18.8, 23.8], 10); // Center on concession area
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Layer groups for different data types
+        const boundaryLayer = L.layerGroup().addTo(map);
+        const roadsLayer = L.layerGroup().addTo(map);
+        const observationsLayer = L.layerGroup().addTo(map);
+
+        // Store markers by type for filtering
+        const markersByType = {
+            Sighting: [],
+            Incident: [],
+            Maintenance: []
+        };
+
+        // Current view state
+        let currentView = 'sightings';
+        let allObservations = [];
+        let latestMarkers = [];
+
+        // Custom marker icons - Safari theme colors
+        const createCustomIcon = (color) => {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                    background-color: ${color};
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    border: 3px solid #2D1810;
+                    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+                    position: relative;
+                ">
+                    <div style="
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 8px;
+                        height: 8px;
+                        background-color: #2D1810;
+                        border-radius: 50%;
+                    "></div>
+                </div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+        };
+
+        const sightingIcon = createCustomIcon('#8B4513');  // Saddle brown for sightings
+        const incidentIcon = createCustomIcon('#DC143C');   // Crimson for incidents
+        const maintenanceIcon = createCustomIcon('#DAA520'); // Goldenrod for maintenance
+
+        // Hide loading message
+        function hideLoading() {
+            const loading = document.getElementById('loading');
+            if (loading) loading.style.display = 'none';
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 5000);
+        }
+
+        // Load concession boundary from local file
+        async function loadBoundary() {
+            try {
+                console.log('Loading concession boundary...');
+                const response = await fetch('data/geojson/boundary.geojson');
+                if (!response.ok) throw new Error(`Boundary file not found: ${response.status}`);
+
+                const geoJson = await response.json();
+                console.log('Boundary data loaded:', geoJson);
+
+                L.geoJSON(geoJson, {
+                    style: {
+                        color: '#2D1810',     // Dark brown border
+                        weight: 4,
+                        opacity: 0.9,
+                        fillColor: '#DEB887',  // Tan fill
+                        fillOpacity: 0.3
+                    }
+                }).addTo(boundaryLayer);
+
+                // Fit map to boundary bounds
+                if (geoJson.features && geoJson.features.length > 0) {
+                    const bounds = L.geoJSON(geoJson).getBounds();
+                    map.fitBounds(bounds, { padding: [20, 20] });
+                }
+
+            } catch (error) {
+                console.error('Error loading boundary:', error);
+                showError('Failed to load concession boundary data');
+            }
+        }
+
+        // Load roads from local file
+        async function loadRoads() {
+            try {
+                console.log('Loading roads...');
+                const response = await fetch('data/geojson/KPR_roads.geojson');
+                if (!response.ok) throw new Error(`Roads file not found: ${response.status}`);
+
+                const geoJson = await response.json();
+                console.log('Roads data loaded:', geoJson);
+
+                L.geoJSON(geoJson, {
+                    style: {
+                        color: '#8B4513', // Saddle brown roads
+                        weight: 3,
+                        opacity: 0.9
+                    },
+                    onEachFeature: function (feature, layer) {
+                        // Add popup with road name when clicked
+                        const roadName = feature.properties && (feature.properties.Roads || feature.properties.name);
+                        if (roadName) {
+                            layer.bindPopup(`<strong>${roadName}</strong>`);
+
+                            // Add road label when zoomed in
+                            layer.on('add', function() {
+                                if (map.getZoom() > 12) {
+                                    addRoadLabel(layer, roadName);
+                                }
+                            });
+
+                            // Update label on zoom
+                            map.on('zoomend', function() {
+                                updateRoadLabels();
+                            });
+                        }
+                    }
+                }).addTo(roadsLayer);
+
+            } catch (error) {
+                console.error('Error loading roads:', error);
+                showError('Failed to load roads data');
+            }
+        }
+
+        // Load observations
+        async function loadObservations() {
+            try {
+                console.log('Loading observations...');
+                const response = await fetch(`${API_BASE_URL}/api/observations`, {
+                    headers: getAuthHeaders()
+                });
+                if (!response.ok) throw new Error(`Observations API returned ${response.status}`);
+
+                const data = await response.json();
+                console.log('Observations data loaded:', data);
+
+                if (data.success && data.data) {
+                    allObservations = data.data; // Store all observations
+
+                    data.data.forEach(observation => {
+                        if (observation.latitude && observation.longitude) {
+                            let icon, popupContent;
+
+                            switch (observation.category) {
+                                case 'Sighting':
+                                    icon = sightingIcon;
+                                    popupContent = `
+                                        <strong>Animal Sighting</strong><br>
+                                        <strong>Species:</strong> ${observation.animal || 'Unknown'}<br>
+                                        <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                        <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                                    `;
+                                    break;
+                                case 'Incident':
+                                    icon = incidentIcon;
+                                    popupContent = `
+                                        <strong>Incident Report</strong><br>
+                                        <strong>Type:</strong> ${observation.incident_type || 'Unknown'}<br>
+                                        <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                        <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                                    `;
+                                    break;
+                                case 'Maintenance':
+                                    icon = maintenanceIcon;
+                                    popupContent = `
+                                        <strong>Maintenance Activity</strong><br>
+                                        <strong>Type:</strong> ${observation.maintenance_type || 'Unknown'}<br>
+                                        <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                        <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                                    `;
+                                    break;
+                                default:
+                                    icon = sightingIcon;
+                                    popupContent = `
+                                        <strong>Observation</strong><br>
+                                        <strong>Category:</strong> ${observation.category}<br>
+                                        <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                        <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                                    `;
+                            }
+
+                            const marker = L.marker([observation.latitude, observation.longitude], { icon })
+                                .bindPopup(popupContent);
+
+                            // Store marker by type for filtering
+                            if (markersByType[observation.category]) {
+                                markersByType[observation.category].push(marker);
+                            }
+                        }
+                    });
+
+                    // Apply current filters and view
+                    applyFilters();
+                    updateStats();
+                }
+
+            } catch (error) {
+                console.error('Error loading observations:', error);
+                showError('Failed to load observation data. Check your connection and try again.');
+            }
+        }
+
+        // Initialize map data loading
+        async function initMap() {
+            try {
+                await Promise.all([
+                    loadBoundary(),
+                    loadRoads(),
+                    loadObservations()
+                ]);
+                hideLoading();
+                console.log('Map initialization complete');
+            } catch (error) {
+                console.error('Error initializing map:', error);
+                hideLoading();
+                showError('Failed to initialize map data. Check your connection and try again.');
+            }
+        }
+
+        // Filter and control functions
+        function toggleMarkers(type, show) {
+            markersByType[type].forEach(marker => {
+                if (show) {
+                    if (!observationsLayer.hasLayer(marker)) {
+                        marker.addTo(observationsLayer);
+                    }
+                } else {
+                    if (observationsLayer.hasLayer(marker)) {
+                        observationsLayer.removeLayer(marker);
+                    }
+                }
+            });
+        }
+
+        function clearLatestMarkers() {
+            latestMarkers.forEach(marker => {
+                if (observationsLayer.hasLayer(marker)) {
+                    observationsLayer.removeLayer(marker);
+                }
+            });
+            latestMarkers = [];
+        }
+
+        function applyFilters() {
+            // Clear all markers first
+            observationsLayer.clearLayers();
+            clearLatestMarkers();
+
+            // Apply date filters
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const selectedMonth = document.getElementById('month-select').value;
+            const selectedYear = document.getElementById('year-select').value;
+
+            // Filter observations based on current view and filters
+            const filteredObservations = allObservations.filter(obs => {
+                // View filter
+                if (currentView === 'sightings' && obs.category !== 'Sighting') return false;
+                if (currentView === 'maintenance' && obs.category !== 'Maintenance') return false;
+                if (currentView === 'incidents' && obs.category !== 'Incident') return false;
+
+                // Date range filter
+                if (startDate || endDate) {
+                    const obsDate = new Date(obs.timestamp);
+                    if (startDate && obsDate < new Date(startDate)) return false;
+                    if (endDate && obsDate > new Date(endDate + 'T23:59:59')) return false;
+                }
+
+                // Month/Year filter
+                if (selectedMonth || selectedYear) {
+                    const obsDate = new Date(obs.timestamp);
+                    if (selectedMonth && obsDate.getMonth() + 1 !== parseInt(selectedMonth)) return false;
+                    if (selectedYear && obsDate.getFullYear() !== parseInt(selectedYear)) return false;
+                }
+
+                // Species filter (sightings only)
+                if (currentView === 'sightings') {
+                    const selectedSpecies = document.getElementById('species-select').value;
+                    if (selectedSpecies && obs.animal !== selectedSpecies) return false;
+                }
+
+                return true;
+            });
+
+            // Add filtered markers to map
+            filteredObservations.forEach(observation => {
+                if (observation.latitude && observation.longitude) {
+                    let icon, popupContent;
+
+                    switch (observation.category) {
+                        case 'Sighting':
+                            icon = sightingIcon;
+                            popupContent = `
+                                <strong>Animal Sighting</strong><br>
+                                <strong>Species:</strong> ${observation.animal || 'Unknown'}<br>
+                                <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                            `;
+                            break;
+                        case 'Incident':
+                            icon = incidentIcon;
+                            popupContent = `
+                                <strong>Incident Report</strong><br>
+                                <strong>Type:</strong> ${observation.incident_type || 'Unknown'}<br>
+                                <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                            `;
+                            break;
+                        case 'Maintenance':
+                            icon = maintenanceIcon;
+                            popupContent = `
+                                <strong>Maintenance Activity</strong><br>
+                                <strong>Type:</strong> ${observation.maintenance_type || 'Unknown'}<br>
+                                <strong>Time:</strong> ${new Date(observation.timestamp).toLocaleString()}<br>
+                                <strong>Location:</strong> ${observation.latitude.toFixed(4)}, ${observation.longitude.toFixed(4)}
+                            `;
+                            break;
+                    }
+
+                    const marker = L.marker([observation.latitude, observation.longitude], { icon })
+                        .bindPopup(popupContent);
+
+                    marker.addTo(observationsLayer);
+                }
+            });
+
+            // Apply latest toggles
+            applyLatestFilters();
+
+            updateStats();
+        }
+
+        function applyLatestFilters() {
+            clearLatestMarkers();
+
+            if (currentView === 'sightings' && document.getElementById('latest-sightings-toggle').checked) {
+                showLatestSightings();
+            } else if (currentView === 'maintenance' && document.getElementById('latest-maintenance-toggle').checked) {
+                showLatestMaintenance();
+            } else if (currentView === 'incidents' && document.getElementById('latest-incidents-toggle').checked) {
+                showLatestIncidents();
+            }
+        }
+
+        function showLatestSightings() {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            const selectedSpecies = document.getElementById('species-select').value;
+
+            allObservations.forEach(obs => {
+                if (obs.category === 'Sighting' &&
+                    new Date(obs.timestamp) > oneWeekAgo &&
+                    (!selectedSpecies || obs.animal === selectedSpecies)) {
+
+                    const animatedIcon = L.divIcon({
+                        className: 'animated-marker',
+                        html: `<div style="
+                            background-color: #8B4513;
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 50%;
+                            border: 4px solid #2D1810;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                            animation: bounce 2s infinite;
+                        ">
+                            <div style="
+                                position: absolute;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                width: 12px;
+                                height: 12px;
+                                background-color: #2D1810;
+                                border-radius: 50%;
+                            "></div>
+                        </div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+
+                    const marker = L.marker([obs.latitude, obs.longitude], { icon: animatedIcon })
+                        .bindPopup(`
+                            <strong>🐘 LATEST SIGHTING</strong><br>
+                            <strong>Species:</strong> ${obs.animal || 'Unknown'}<br>
+                            <strong>Time:</strong> ${new Date(obs.timestamp).toLocaleString()}<br>
+                            <strong>Location:</strong> ${obs.latitude.toFixed(4)}, ${obs.longitude.toFixed(4)}
+                        `);
+
+                    marker.addTo(observationsLayer);
+                    latestMarkers.push(marker);
+                }
+            });
+        }
+
+        function showLatestMaintenance() {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            allObservations.forEach(obs => {
+                if (obs.category === 'Maintenance' && new Date(obs.timestamp) > oneWeekAgo) {
+                    const animatedIcon = L.divIcon({
+                        className: 'animated-marker',
+                        html: `<div style="
+                            background-color: #DAA520;
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 50%;
+                            border: 4px solid #2D1810;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                            animation: bounce 2s infinite;
+                        ">
+                            <div style="
+                                position: absolute;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                width: 12px;
+                                height: 12px;
+                                background-color: #2D1810;
+                                border-radius: 50%;
+                            "></div>
+                        </div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+
+                    const marker = L.marker([obs.latitude, obs.longitude], { icon: animatedIcon })
+                        .bindPopup(`
+                            <strong>🔧 LATEST MAINTENANCE</strong><br>
+                            <strong>Type:</strong> ${obs.maintenance_type || 'Unknown'}<br>
+                            <strong>Time:</strong> ${new Date(obs.timestamp).toLocaleString()}<br>
+                            <strong>Location:</strong> ${obs.latitude.toFixed(4)}, ${obs.longitude.toFixed(4)}
+                        `);
+
+                    marker.addTo(observationsLayer);
+                    latestMarkers.push(marker);
+                }
+            });
+        }
+
+        function showLatestIncidents() {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            allObservations.forEach(obs => {
+                if (obs.category === 'Incident' && new Date(obs.timestamp) > oneWeekAgo) {
+                    const animatedIcon = L.divIcon({
+                        className: 'animated-marker',
+                        html: `<div style="
+                            background-color: #DC143C;
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 50%;
+                            border: 4px solid #2D1810;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                            animation: bounce 2s infinite;
+                        ">
+                            <div style="
+                                position: absolute;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                width: 12px;
+                                height: 12px;
+                                background-color: #2D1810;
+                                border-radius: 50%;
+                            "></div>
+                        </div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+
+                    const marker = L.marker([obs.latitude, obs.longitude], { icon: animatedIcon })
+                        .bindPopup(`
+                            <strong>🚨 LATEST INCIDENT</strong><br>
+                            <strong>Type:</strong> ${obs.incident_type || 'Unknown'}<br>
+                            <strong>Time:</strong> ${new Date(obs.timestamp).toLocaleString()}<br>
+                            <strong>Location:</strong> ${obs.latitude.toFixed(4)}, ${obs.longitude.toFixed(4)}
+                        `);
+
+                    marker.addTo(observationsLayer);
+                    latestMarkers.push(marker);
+                }
+            });
+        }
+
+        function updateStats() {
+            const filteredCount = observationsLayer.getLayers().length - latestMarkers.length;
+
+            if (currentView === 'sightings') {
+                document.getElementById('total-records').textContent = filteredCount;
+            } else if (currentView === 'maintenance') {
+                document.getElementById('maintenance-records').textContent = filteredCount;
+            } else if (currentView === 'incidents') {
+                document.getElementById('incident-records').textContent = filteredCount;
+            }
+        }
+
+        // Set up all event listeners
+        function setupFilters() {
+            // View toggle buttons
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Update active button
+                    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Update current view
+                    currentView = this.dataset.view;
+
+                    // Show/hide appropriate controls
+                    document.getElementById('species-group').style.display =
+                        currentView === 'sightings' ? 'block' : 'none';
+                    document.getElementById('maintenance-group').style.display =
+                        currentView === 'maintenance' ? 'block' : 'none';
+                    document.getElementById('incidents-group').style.display =
+                        currentView === 'incidents' ? 'block' : 'none';
+
+                    // Reapply filters
+                    applyFilters();
+                });
+            });
+
+            // Date filters
+            ['start-date', 'end-date', 'month-select', 'year-select'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFilters);
+            });
+
+            // Species filter
+            document.getElementById('species-select').addEventListener('change', applyFilters);
+
+            // Latest toggles
+            ['latest-sightings-toggle', 'latest-maintenance-toggle', 'latest-incidents-toggle'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyLatestFilters);
+            });
+        }
+
+        // Road label management
+        const roadLabels = new Map();
+
+        function addRoadLabel(layer, roadName) {
+            // Remove existing label for this layer
+            if (roadLabels.has(layer)) {
+                map.removeLayer(roadLabels.get(layer));
+            }
+
+            // Get the center of the road geometry
+            const bounds = layer.getBounds();
+            const center = bounds.getCenter();
+
+            // Create label marker
+            const label = L.marker(center, {
+                icon: L.divIcon({
+                    className: 'road-label',
+                    html: `<div style="
+                        background: rgba(255, 255, 255, 0.9);
+                        border: 1px solid #8B4513;
+                        border-radius: 3px;
+                        padding: 2px 6px;
+                        font-size: 11px;
+                        font-weight: bold;
+                        color: #8B4513;
+                        white-space: nowrap;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                    ">${roadName}</div>`,
+                    iconSize: null,
+                    iconAnchor: [0, 0]
+                })
+            });
+
+            label.addTo(map);
+            roadLabels.set(layer, label);
+        }
+
+        function updateRoadLabels() {
+            const zoom = map.getZoom();
+            roadLabels.forEach((label, layer) => {
+                if (zoom > 12) {
+                    if (!map.hasLayer(label)) {
+                        label.addTo(map);
+                    }
+                } else {
+                    if (map.hasLayer(label)) {
+                        map.removeLayer(label);
+                    }
+                }
+            });
+        }
+
+        // Start the map
+        initMap();
+        setupFilters();
+    </script>
+</body>
+</html>
