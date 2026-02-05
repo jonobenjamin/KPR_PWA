@@ -51,3 +51,8 @@ backend/firebase-service-account.json
 .env
 .env.local
 .env.production
+
+# Local folders (not part of the PWA deployment)
+/HTML/
+/WildlifeTracker-main/
+/WildlifeTracker-Front_End-main/

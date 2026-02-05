@@ -1,7 +1,0 @@
-# Configuration files with secrets
-config.js
-
-# Other common ignores
-*.log
-.DS_Store
-node_modules/
