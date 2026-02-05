@@ -92155,7 +92155,7 @@ N(a){var s,r,q,p,o,n,m=this,l=null,k=m.a,j=A.dG(k.c,l,l,l,l,l,l),i=t.p
 j=A.a2L(A.b([A.i8(k.d,new A.att(m),l),new A.kN(A.aEz(m.cy,t.z),new A.atu(),l,l,t.lo)],i),!0,j)
 k=m.z
 s=A.AC(k?B.kv:B.GI,l,l,l)
-s=A.b([A.aFk(s,A.dG(k?"Close Map":"Concession Map",l,l,l,l,l,l),new A.atv(m),A.aAI(l,l,l,l,l,l,l,l,l,l,l,B.lL,l,l,l,l,l,l,B.Ai,l)),B.cl],i)
+s=A.b([A.aFk(s,A.dG(k?"Close Map":"View Map",l,l,l,l,l,l),new A.atv(m),A.aAI(l,l,l,l,l,l,l,l,l,l,l,B.lL,l,l,l,l,l,l,B.Ai,l)),B.cl],i)
 if(m.z)B.b.P(s,A.b([A.fI(new A.Bv(new A.atx(m),m.Q,l),400,l),B.cl],i))
 k=m.y
 r=A.AC(k?B.kv:B.Gz,l,l,l)
