@@ -377,18 +377,28 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: const Text('Wildlife Tracker 🔄'),
         actions: [
-          // Updates button - Simple version for testing
+          // Test button to verify deployment
+          TextButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('TEST BUTTON WORKS!')),
+              );
+            },
+            child: const Text('TEST', style: TextStyle(color: Colors.white)),
+          ),
+          // Updates button
           IconButton(
             icon: const Icon(Icons.system_update),
             onPressed: () {
+              print('Update button clicked!');
               widget.updateManager.checkForUpdates();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Checking for updates...')),
+                const SnackBar(content: Text('Update check initiated')),
               );
             },
-            tooltip: 'Check for updates',
+            tooltip: 'APP UPDATES',
           ),
           ValueListenableBuilder(
             valueListenable: box.listenable(),

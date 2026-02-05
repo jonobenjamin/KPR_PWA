@@ -1,2 +1,1 @@
-# This file tells GitHub Pages to not process files with Jekyll
-# Required for Flutter PWAs in the docs folder
+.nojekyll
