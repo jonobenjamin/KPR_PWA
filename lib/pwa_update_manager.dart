@@ -19,30 +19,28 @@ class PwaUpdateManager extends ChangeNotifier {
         return;
       }
 
-      // Listen for service worker updates
-      html.window.navigator.serviceWorker?.addEventListener('message', (event) {
-        final data = (event as html.MessageEvent).data;
-        if (data == 'update_available') {
-          _updateAvailable = true;
-          notifyListeners();
-        }
-      });
-
-      // Check for existing service worker
+      // Get the service worker registration
       _registration = await html.window.navigator.serviceWorker?.ready;
 
-      // Listen for updates
-      _registration?.addEventListener('updatefound', (event) {
+      // Listen for updates using Flutter's service worker pattern
+      _registration?.addEventListener('updatefound', (html.Event event) {
         final newWorker = _registration?.installing;
         if (newWorker != null) {
-          newWorker.addEventListener('statechange', (event) {
-            if (newWorker.state == 'installed' && html.window.navigator.onLine!) {
-              _updateAvailable = true;
-              notifyListeners();
+          newWorker.addEventListener('statechange', (html.Event event) {
+            if (newWorker.state == 'installed') {
+              // Check if there's a waiting worker (new version ready)
+              if (_registration?.waiting != null) {
+                _updateAvailable = true;
+                notifyListeners();
+                debugPrint('New PWA version available');
+              }
             }
           });
         }
       });
+
+      // Also check periodically for updates
+      _startPeriodicUpdateCheck();
 
       debugPrint('PWA Update Manager initialized');
     } catch (e) {
@@ -50,16 +48,26 @@ class PwaUpdateManager extends ChangeNotifier {
     }
   }
 
+  /// Start periodic update checking
+  void _startPeriodicUpdateCheck() {
+    // Check for updates every 5 minutes when the app is visible
+    html.document.addEventListener('visibilitychange', (html.Event event) {
+      if (html.document.visibilityState == 'visible') {
+        checkForUpdates();
+      }
+    });
+  }
+
   /// Apply the available update
   Future<void> applyUpdate() async {
     if (!kIsWeb || !_updateAvailable) return;
 
     try {
-      // Skip waiting for the new service worker
+      // Tell the waiting service worker to skip waiting and activate
       _registration?.waiting?.postMessage({'type': 'SKIP_WAITING'});
 
-      // Listen for the controlling change
-      html.window.navigator.serviceWorker?.addEventListener('controllerchange', (event) {
+      // Listen for when the new service worker takes control
+      html.window.navigator.serviceWorker?.addEventListener('controllerchange', (html.Event event) {
         // Reload the page to get the new version
         html.window.location.reload();
       });
