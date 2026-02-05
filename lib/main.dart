@@ -377,28 +377,57 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wildlife Tracker 🔄'),
+        title: Text(widget.title),
         actions: [
-          // Test button to verify deployment
-          TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('TEST BUTTON WORKS!')),
+          // Updates button with badge
+          AnimatedBuilder(
+            animation: widget.updateManager,
+            builder: (context, _) {
+              final updateAvailable = widget.updateManager.updateAvailable;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.system_update),
+                    onPressed: () {
+                      if (updateAvailable) {
+                        _showUpdateDialog(context);
+                      } else {
+                        widget.updateManager.checkForUpdates();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Checking for updates...')),
+                        );
+                      }
+                    },
+                    tooltip: updateAvailable ? 'Update available' : 'Check for updates',
+                  ),
+                  if (updateAvailable)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: const Text(
+                          '1',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
-            child: const Text('TEST', style: TextStyle(color: Colors.white)),
-          ),
-          // Updates button
-          IconButton(
-            icon: const Icon(Icons.system_update),
-            onPressed: () {
-              print('Update button clicked!');
-              widget.updateManager.checkForUpdates();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Update check initiated')),
-              );
-            },
-            tooltip: 'APP UPDATES',
           ),
           ValueListenableBuilder(
             valueListenable: box.listenable(),
