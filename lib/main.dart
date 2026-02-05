@@ -378,57 +378,18 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        leading: ListenableBuilder(
-          listenable: widget.updateManager,
-          builder: (context, _) {
-            final updateAvailable = widget.updateManager.updateAvailable;
-            return Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.system_update),
-                  onPressed: () {
-                    if (updateAvailable) {
-                      _showUpdateDialog(context);
-                    } else {
-                      // Check for updates manually
-                      widget.updateManager.checkForUpdates();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Checking for updates...')),
-                      );
-                    }
-                  },
-                  tooltip: updateAvailable ? 'Update available' : 'Check for updates',
-                ),
-                if (updateAvailable)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: const Text(
-                        '1',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
         actions: [
+          // Updates button - Simple version for testing
+          IconButton(
+            icon: const Icon(Icons.system_update),
+            onPressed: () {
+              widget.updateManager.checkForUpdates();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Checking for updates...')),
+              );
+            },
+            tooltip: 'Check for updates',
+          ),
           ValueListenableBuilder(
             valueListenable: box.listenable(),
             builder: (context, Box box, _) {
