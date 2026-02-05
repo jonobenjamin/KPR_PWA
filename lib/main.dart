@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'dart:convert';
 import 'map_screen.dart';
+import 'pwa_update_manager.dart';
 
 // API Configuration - Replace with your Vercel backend URL
 const String API_BASE_URL = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://wildlife-tracker-gxz5.vercel.app');
@@ -31,6 +32,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final Box userBox = Hive.box('userData');
+  final PwaUpdateManager _updateManager = PwaUpdateManager();
   bool _isLoading = true;
   String? _selectedUser;
 
@@ -38,6 +40,7 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _checkUserSelection();
+    _updateManager.initialize();
   }
 
   Future<void> _checkUserSelection() async {
@@ -65,16 +68,17 @@ class _MyAppState extends State<MyApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: _selectedUser != null
-          ? const MyHomePage(title: 'Wildlife Tracker')
-          : const UserSelectionScreen(),
+          ? MyHomePage(title: 'Wildlife Tracker', updateManager: _updateManager)
+          : UserSelectionScreen(updateManager: _updateManager),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  const MyHomePage({super.key, required this.title, required this.updateManager});
 
   final String title;
+  final PwaUpdateManager updateManager;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -106,6 +110,38 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final Box box = Hive.box('offlineData');
   final Box userBox = Hive.box('userData');
+
+  // Show update dialog
+  void _showUpdateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Update Available'),
+          content: const Text('A new version of the app is available. Would you like to update now?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.updateManager.clearUpdateNotification();
+              },
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.updateManager.applyUpdate();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Applying update...')),
+                );
+              },
+              child: const Text('Update Now'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   // Submit data offline with GPS
   Future<void> _submitData() async {
@@ -342,6 +378,56 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        leading: ListenableBuilder(
+          listenable: widget.updateManager,
+          builder: (context, _) {
+            final updateAvailable = widget.updateManager.updateAvailable;
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.system_update),
+                  onPressed: () {
+                    if (updateAvailable) {
+                      _showUpdateDialog(context);
+                    } else {
+                      // Check for updates manually
+                      widget.updateManager.checkForUpdates();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Checking for updates...')),
+                      );
+                    }
+                  },
+                  tooltip: updateAvailable ? 'Update available' : 'Check for updates',
+                ),
+                if (updateAvailable)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: const Text(
+                        '1',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         actions: [
           ValueListenableBuilder(
             valueListenable: box.listenable(),
@@ -612,7 +698,9 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class UserSelectionScreen extends StatefulWidget {
-  const UserSelectionScreen({super.key});
+  const UserSelectionScreen({super.key, required this.updateManager});
+
+  final PwaUpdateManager updateManager;
 
   @override
   State<UserSelectionScreen> createState() => _UserSelectionScreenState();
@@ -621,6 +709,7 @@ class UserSelectionScreen extends StatefulWidget {
 class _UserSelectionScreenState extends State<UserSelectionScreen> {
   final Box userBox = Hive.box('userData');
   String? _selectedUser;
+  late final PwaUpdateManager _updateManager = widget.updateManager;
 
   final List<String> _users = [
     'Jonathan Benjamin',
@@ -707,7 +796,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen> {
       // Navigate to main app
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => const MyHomePage(title: 'Wildlife Tracker'),
+          builder: (context) => MyHomePage(title: 'Wildlife Tracker', updateManager: _updateManager),
         ),
       );
     }
