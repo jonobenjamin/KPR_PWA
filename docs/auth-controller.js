@@ -15,42 +15,12 @@ class AuthController {
 
       // Check if user is already authenticated
       const isAuthenticated = window.authService.isAuthenticated();
+      console.log('Auth controller init - isAuthenticated:', isAuthenticated);
+      console.log('Auth controller init - currentUser:', window.authService.currentUser);
 
       if (isAuthenticated) {
-        // Check user status in Firestore (with retry for new users)
-        console.log('User is authenticated, checking status...');
-
-        let userStatus = null;
-        let retries = 0;
-        const maxRetries = 3;
-
-        while (!userStatus && retries < maxRetries) {
-          userStatus = await window.authService.checkUserStatus();
-          if (!userStatus) {
-            console.log(`User status not found, retrying... (${retries + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-            retries++;
-          }
-        }
-
-        console.log('Final user status result:', userStatus);
-
-        if (userStatus && userStatus.status === 'active') {
-          console.log('User is authenticated and active, proceeding to app');
-          this.startFlutterApp();
-          return;
-        } else if (userStatus && userStatus.status === 'revoked') {
-          console.log('User account is revoked');
-          this.showRevokedScreen();
-          return;
-        } else if (userStatus && userStatus.status === 'pending') {
-          console.log('User account is pending approval');
-          // For now, treat pending as active since no approval is required
-          this.startFlutterApp();
-          return;
-        } else {
-          console.log('User status unknown or missing, showing login');
-        }
+        await this.handleAuthenticatedUser();
+        return;
       }
 
       // Show authentication UI
@@ -201,6 +171,55 @@ class AuthController {
       };
       checkFirebase();
     });
+  }
+
+  // Method to re-check auth state (called after PIN verification)
+  checkAuthState() {
+    console.log('Re-checking auth state...');
+    const isAuthenticated = window.authService.isAuthenticated();
+    console.log('Re-check - isAuthenticated:', isAuthenticated);
+
+    if (isAuthenticated) {
+      this.handleAuthenticatedUser();
+    }
+  }
+
+  async handleAuthenticatedUser() {
+    // Check user status in Firestore (with retry for new users)
+    console.log('User is authenticated, checking status...');
+
+    let userStatus = null;
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (!userStatus && retries < maxRetries) {
+      userStatus = await window.authService.checkUserStatus();
+      if (!userStatus) {
+        console.log(`User status not found, retrying... (${retries + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        retries++;
+      }
+    }
+
+    console.log('Final user status result:', userStatus);
+
+    if (userStatus && userStatus.status === 'active') {
+      console.log('User is authenticated and active, proceeding to app');
+      this.startFlutterApp();
+      return;
+    } else if (userStatus && userStatus.status === 'revoked') {
+      console.log('User account is revoked');
+      this.showRevokedScreen();
+      return;
+    } else if (userStatus && userStatus.status === 'pending') {
+      console.log('User account is pending approval');
+      // For now, treat pending as active since no approval is required
+      this.startFlutterApp();
+      return;
+    } else {
+      console.log('User status unknown or missing, showing login');
+      this.showAuthScreen();
+    }
   }
 }
 
