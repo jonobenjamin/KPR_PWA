@@ -6,7 +6,10 @@ class AuthService {
     this.init();
   }
 
-  init() {
+  async init() {
+    // Wait for Firebase to be ready
+    await this.waitForFirebase();
+
     const { auth, onAuthStateChanged } = window.firebaseAuth;
 
     onAuthStateChanged(auth, (user) => {
@@ -17,6 +20,19 @@ class AuthService {
       } else {
         console.log('User signed out');
       }
+    });
+  }
+
+  waitForFirebase() {
+    return new Promise((resolve) => {
+      const checkFirebase = () => {
+        if (window.firebaseAuth && window.firebaseAuth.auth) {
+          resolve();
+        } else {
+          setTimeout(checkFirebase, 100);
+        }
+      };
+      checkFirebase();
     });
   }
 
