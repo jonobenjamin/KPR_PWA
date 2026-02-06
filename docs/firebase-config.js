@@ -33,7 +33,7 @@ console.log('Firebase config initializing...');
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getFirestore(app, "wildlifetracker-db");
 
 console.log('Firebase initialized:', { app, auth, db });
 
