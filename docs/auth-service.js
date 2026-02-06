@@ -126,8 +126,14 @@ class AuthService {
 
       // Create/update user document
       console.log('Creating/updating user document...');
-      await this.createOrUpdateUser(result.user, { email, name: data.name });
-      console.log('User document created/updated');
+      try {
+        await this.createOrUpdateUser(result.user, { email, name: data.name });
+        console.log('User document created/updated successfully');
+      } catch (error) {
+        console.error('❌ CRITICAL: Failed to create user document:', error);
+        console.error('❌ Error details:', error.code, error.message);
+        // Don't throw here - continue with authentication even if user doc fails
+      }
 
       // Auth controller will automatically detect the sign-in via onAuthStateChanged listener
       console.log('PIN verification complete - auth state listener will handle the rest');
@@ -172,22 +178,62 @@ class AuthService {
 
   // User Management
   async createOrUpdateUser(user, userData) {
+    console.log('🔥 STARTING createOrUpdateUser method');
+    console.log('🔥 User object:', { uid: user.uid, email: user.email });
+    console.log('🔥 UserData:', userData);
+    console.log('🔥 Firestore instance available:', !!this.db);
+    console.log('🔥 Auth instance available:', !!this.auth);
+    console.log('🔥 Current user authenticated:', this.auth?.currentUser ? 'YES' : 'NO');
+
+    if (!this.db) {
+      throw new Error('Firestore instance not available');
+    }
+
+    if (!this.auth?.currentUser) {
+      throw new Error('User not authenticated');
+    }
+
     const userDoc = {
+      uid: user.uid,
       name: userData.name,
       email: userData.email,
       phone: userData.phone || null,
+      role: 'user',
       status: 'active',
       registeredAt: userData.registeredAt || serverTimestamp(),
       lastLogin: serverTimestamp()
     };
 
+    console.log('🔥 User document data to write:', userDoc);
+
     try {
-      await setDoc(doc(this.db, 'users', user.uid), userDoc, { merge: true });
-      console.log('User document created/updated:', user.uid);
+      const docRef = doc(this.db, 'users', user.uid);
+      console.log('🔥 Document reference path:', docRef.path);
+      console.log('🔥 About to call setDoc...');
+
+      await setDoc(docRef, userDoc, { merge: true });
+
+      console.log('✅ setDoc completed successfully');
+
+      // Verify the document was created
+      console.log('🔍 Verifying document creation...');
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        console.log('✅ Document verification successful!');
+        console.log('✅ Document data:', docSnap.data());
+      } else {
+        console.error('❌ Document verification failed - document does not exist after creation');
+      }
+
     } catch (error) {
-      console.error('Failed to create/update user document:', error);
+      console.error('❌ CRITICAL ERROR in createOrUpdateUser:');
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Full error object:', error);
       throw error;
     }
+
+    console.log('🔥 createOrUpdateUser method completed');
   }
 
   async updateUserLastLogin(uid) {
