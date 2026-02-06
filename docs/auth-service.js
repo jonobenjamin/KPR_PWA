@@ -211,9 +211,24 @@ class AuthService {
       console.log('🔥 Document reference path:', docRef.path);
       console.log('🔥 About to call setDoc...');
 
-      await setDoc(docRef, userDoc, { merge: true });
+      try {
+        console.log('🔥 Calling setDoc with timeout...');
+        const setDocPromise = setDoc(docRef, userDoc, { merge: true });
 
-      console.log('✅ setDoc completed successfully');
+        // Add timeout to catch hanging requests
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('setDoc timeout after 10 seconds')), 10000)
+        );
+
+        await Promise.race([setDocPromise, timeoutPromise]);
+        console.log('✅ setDoc completed successfully');
+      } catch (setDocError) {
+        console.error('❌ setDoc failed with error:');
+        console.error('❌ Error code:', setDocError.code);
+        console.error('❌ Error message:', setDocError.message);
+        console.error('❌ Full error:', setDocError);
+        throw setDocError;
+      }
 
       // Verify the document was created
       console.log('🔍 Verifying document creation...');
