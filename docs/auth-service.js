@@ -129,6 +129,15 @@ class AuthService {
       await this.createOrUpdateUser(result.user, { email, name: data.name });
       console.log('User document created/updated');
 
+      // Force re-check of authentication state
+      console.log('PIN verification complete - notifying auth controller');
+      if (window.authController) {
+        setTimeout(() => {
+          console.log('Triggering auth controller re-check');
+          window.authController.checkAuthState();
+        }, 1000); // Give Firebase a moment to settle
+      }
+
       return { success: true, user: result.user };
     } catch (error) {
       console.error('Email PIN verification failed:', error);
