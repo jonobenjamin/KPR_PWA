@@ -120,8 +120,18 @@ class AuthService {
   // Phone Authentication
   async requestPhoneOtp(phoneNumber, name) {
     try {
+      console.log('requestPhoneOtp called, this.auth:', this.auth);
+      console.log('window.firebaseAuth:', window.firebaseAuth);
+
       if (!this.auth) {
-        throw new Error('Firebase auth not initialized');
+        // Try to get auth from window.firebaseAuth as fallback
+        if (window.firebaseAuth && window.firebaseAuth.auth) {
+          this.auth = window.firebaseAuth.auth;
+          this.db = window.firebaseAuth.db;
+          console.log('Got auth from window.firebaseAuth');
+        } else {
+          throw new Error('Firebase auth not available');
+        }
       }
 
       // Initialize reCAPTCHA if not already done
