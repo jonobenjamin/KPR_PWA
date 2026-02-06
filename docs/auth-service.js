@@ -67,6 +67,7 @@ class AuthService {
   // Email PIN Authentication
   async requestEmailPin(email, name) {
     try {
+      console.log('Making PIN request for:', email);
       const response = await fetch('https://wildlife-tracker-gxz5.vercel.app/api/auth/request-pin', {
         method: 'POST',
         headers: {
@@ -75,20 +76,28 @@ class AuthService {
         body: JSON.stringify({ email, name })
       });
 
+      console.log('PIN request response status:', response.status);
+      console.log('PIN request response ok:', response.ok);
+
       if (!response.ok) {
-        const error = await response.json();
+        const errorText = await response.text();
+        console.log('PIN request error response:', errorText);
+        const error = await response.json().catch(() => ({ message: errorText }));
         throw new Error(error.message || 'Failed to send PIN');
       }
 
+      const result = await response.json();
+      console.log('PIN request success:', result);
       return { success: true, message: 'PIN sent to your email' };
     } catch (error) {
       console.error('Email PIN request failed:', error);
-      throw error;
+      throw new Error(`Failed to send PIN: ${error.message}`);
     }
   }
 
   async verifyEmailPin(email, pin) {
     try {
+      console.log('Making PIN verification request for:', email, 'PIN length:', pin.length);
       const response = await fetch('https://wildlife-tracker-gxz5.vercel.app/api/auth/verify-pin', {
         method: 'POST',
         headers: {
@@ -97,18 +106,28 @@ class AuthService {
         body: JSON.stringify({ email, pin })
       });
 
+      console.log('PIN verification response status:', response.status);
+      console.log('PIN verification response ok:', response.ok);
+
       if (!response.ok) {
-        const error = await response.json();
+        const errorText = await response.text();
+        console.log('PIN verification error response:', errorText);
+        const error = await response.json().catch(() => ({ message: errorText }));
         throw new Error(error.message || 'Invalid PIN');
       }
 
       const data = await response.json();
+      console.log('PIN verification success, received custom token:', !!data.customToken);
 
       // Sign in with custom token
+      console.log('Signing in with custom token...');
       const result = await signInWithCustomToken(this.auth, data.customToken);
+      console.log('Firebase sign in successful for user:', result.user.uid);
 
       // Create/update user document
+      console.log('Creating/updating user document...');
       await this.createOrUpdateUser(result.user, { email, name: data.name });
+      console.log('User document created/updated');
 
       return { success: true, user: result.user };
     } catch (error) {
