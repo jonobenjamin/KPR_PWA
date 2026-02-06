@@ -5,14 +5,16 @@ import {
   signInWithPhoneNumber,
   RecaptchaVerifier,
   signOut,
-  onAuthStateChanged,
+  onAuthStateChanged
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import {
+  getFirestore,
   doc,
   setDoc,
   getDoc,
   updateDoc,
   serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 class AuthService {
   constructor() {
