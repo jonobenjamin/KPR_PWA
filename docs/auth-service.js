@@ -117,98 +117,13 @@ class AuthService {
     }
   }
 
-  // Phone Authentication
+  // Phone Authentication - Temporarily disabled due to Firebase config issues
   async requestPhoneOtp(phoneNumber, name) {
-    try {
-      console.log('requestPhoneOtp called, this.auth:', this.auth);
+    console.log('Phone authentication is currently disabled due to Firebase configuration issues.');
+    console.log('Please use email authentication instead.');
 
-      if (!this.auth) {
-        throw new Error('Firebase auth not initialized');
-      }
-
-      // For now, skip reCAPTCHA and try direct phone auth
-      // This might work if the domain is properly configured
-      console.log('Attempting phone auth without reCAPTCHA...');
-
-      const phoneNumberFormatted = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-      console.log('Formatted phone number:', phoneNumberFormatted);
-
-      try {
-        const confirmationResult = await signInWithPhoneNumber(
-          this.auth,
-          phoneNumberFormatted
-          // Note: No reCAPTCHA verifier - Firebase might handle this automatically
-        );
-
-        console.log('Phone auth successful, confirmation result:', confirmationResult);
-        this.confirmationResult = confirmationResult;
-        return { success: true, message: 'OTP sent to your phone' };
-
-      } catch (phoneError) {
-        console.error('Phone auth failed:', phoneError);
-
-        // If direct auth fails, try with reCAPTCHA as fallback
-        console.log('Trying with reCAPTCHA fallback...');
-
-        if (!this.recaptchaVerifier) {
-          const container = document.getElementById('recaptcha-container');
-          console.log('reCAPTCHA container element:', container);
-
-          if (!container) {
-            throw new Error('reCAPTCHA container not found in DOM');
-          }
-
-          try {
-            console.log('Creating RecaptchaVerifier...');
-            this.recaptchaVerifier = new RecaptchaVerifier(
-              container,
-              {
-                size: 'normal',
-                callback: (response) => {
-                  console.log('reCAPTCHA solved:', response);
-                },
-                'expired-callback': () => {
-                  console.log('reCAPTCHA expired');
-                }
-              },
-              this.auth
-            );
-            console.log('RecaptchaVerifier created successfully');
-          } catch (recaptchaError) {
-            console.error('RecaptchaVerifier creation failed:', recaptchaError);
-            throw new Error(`Phone auth setup failed: ${recaptchaError.message}`);
-          }
-        }
-
-        // Retry with reCAPTCHA
-        const confirmationResult = await signInWithPhoneNumber(
-          this.auth,
-          phoneNumberFormatted,
-          this.recaptchaVerifier
-        );
-
-        this.confirmationResult = confirmationResult;
-
-        // Create/update user document for phone auth
-        // We'll update it properly after successful verification
-        const tempUserData = {
-          name,
-          email: null,
-          phone: phoneNumberFormatted,
-          status: 'active',
-          registeredAt: serverTimestamp(),
-          lastLogin: null // Will be set after verification
-        };
-
-        // Store temporarily - will be updated after verification
-        sessionStorage.setItem('pendingPhoneUser', JSON.stringify(tempUserData));
-
-        return { success: true, message: 'OTP sent to your phone' };
-      }
-    } catch (error) {
-      console.error('Phone OTP request failed:', error);
-      throw new Error(`Failed to send OTP: ${error.message}`);
-    }
+    // Show user-friendly error
+    throw new Error('Phone authentication is temporarily unavailable. Please use email authentication.');
   }
 
   async verifyPhoneOtp(otp) {
