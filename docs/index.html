@@ -31,8 +31,14 @@
 
   <title>offline_mobile_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Firebase SDKs -->
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="auth-service.js"></script>
+  <script type="module" src="auth-ui.js"></script>
+  <script type="module" src="auth-controller.js"></script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- Flutter will be loaded by auth-controller.js after authentication -->
 </body>
 </html>
