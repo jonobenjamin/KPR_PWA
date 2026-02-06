@@ -17,8 +17,23 @@ class AuthController {
       const isAuthenticated = window.authService.isAuthenticated();
 
       if (isAuthenticated) {
-        // Check user status in Firestore
-        const userStatus = await window.authService.checkUserStatus();
+        // Check user status in Firestore (with retry for new users)
+        console.log('User is authenticated, checking status...');
+
+        let userStatus = null;
+        let retries = 0;
+        const maxRetries = 3;
+
+        while (!userStatus && retries < maxRetries) {
+          userStatus = await window.authService.checkUserStatus();
+          if (!userStatus) {
+            console.log(`User status not found, retrying... (${retries + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            retries++;
+          }
+        }
+
+        console.log('Final user status result:', userStatus);
 
         if (userStatus && userStatus.status === 'active') {
           console.log('User is authenticated and active, proceeding to app');
@@ -28,6 +43,13 @@ class AuthController {
           console.log('User account is revoked');
           this.showRevokedScreen();
           return;
+        } else if (userStatus && userStatus.status === 'pending') {
+          console.log('User account is pending approval');
+          // For now, treat pending as active since no approval is required
+          this.startFlutterApp();
+          return;
+        } else {
+          console.log('User status unknown or missing, showing login');
         }
       }
 
@@ -147,18 +169,25 @@ class AuthController {
   }
 
   startFlutterApp() {
+    console.log('🎯 STARTING FLUTTER APP - User is authenticated and active');
+
     // Hide auth overlay if it exists
     const overlay = document.getElementById('auth-overlay');
     if (overlay) {
       overlay.style.display = 'none';
+      console.log('Auth overlay hidden');
     }
 
     // Start Flutter app by loading flutter_bootstrap.js
-    console.log('Starting Flutter app...');
+    console.log('Loading Flutter bootstrap script...');
     const script = document.createElement('script');
     script.src = 'flutter_bootstrap.js';
     script.async = true;
+    script.onload = () => console.log('Flutter bootstrap script loaded successfully');
+    script.onerror = (e) => console.error('Failed to load Flutter bootstrap script:', e);
     document.body.appendChild(script);
+
+    console.log('Flutter app initialization complete');
   }
 
   waitForFirebase() {
