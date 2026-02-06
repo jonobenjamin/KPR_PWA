@@ -212,21 +212,43 @@ class AuthService {
       console.log('🔥 About to call setDoc...');
 
       try {
-        console.log('🔥 Calling setDoc with timeout...');
-        const setDocPromise = setDoc(docRef, userDoc, { merge: true });
+        console.log('🔥 Testing basic Firestore connectivity first...');
 
-        // Add timeout to catch hanging requests
-        const timeoutPromise = new Promise((_, reject) =>
+        // Test connectivity by trying to read from observations collection (which works)
+        console.log('🔥 Attempting to read from observations collection to test connectivity...');
+        const testDocRef = doc(this.db, 'observations', 'connectivity_test_' + Date.now());
+        const testReadPromise = getDoc(testDocRef);
+        const testTimeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connectivity test timeout')), 5000)
+        );
+
+        await Promise.race([testReadPromise, testTimeoutPromise]);
+        console.log('✅ Firestore connectivity test passed (can read from observations)');
+
+        console.log('🔥 Now calling setDoc...');
+        const setDocPromise = setDoc(docRef, userDoc, { merge: true });
+        const setDocTimeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('setDoc timeout after 10 seconds')), 10000)
         );
 
-        await Promise.race([setDocPromise, timeoutPromise]);
+        await Promise.race([setDocPromise, setDocTimeoutPromise]);
         console.log('✅ setDoc completed successfully');
       } catch (setDocError) {
         console.error('❌ setDoc failed with error:');
         console.error('❌ Error code:', setDocError.code);
         console.error('❌ Error message:', setDocError.message);
         console.error('❌ Full error:', setDocError);
+
+        // Check if it's a network/connectivity error
+        if (setDocError.message.includes('timeout') || setDocError.message.includes('network')) {
+          console.error('🚨 USERS COLLECTION ISSUE: Connectivity works (observations collection accessible)');
+          console.error('🚨 But users collection writes are blocked. Possible causes:');
+          console.error('🚨 - Users collection rules not applied correctly');
+          console.error('🚨 - Document ID format issues');
+          console.error('🚨 - Users collection name conflict');
+          console.error('🚨 - Firebase security/policies specific to users collection');
+        }
+
         throw setDocError;
       }
 
