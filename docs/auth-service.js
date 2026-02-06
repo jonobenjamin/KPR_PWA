@@ -137,20 +137,33 @@ class AuthService {
       // Initialize reCAPTCHA if not already done
       if (!this.recaptchaVerifier) {
         const container = document.getElementById('recaptcha-container');
+        console.log('reCAPTCHA container element:', container);
+
         if (!container) {
-          throw new Error('reCAPTCHA container not found');
+          throw new Error('reCAPTCHA container not found in DOM');
         }
 
-        this.recaptchaVerifier = new RecaptchaVerifier(
-          container,
-          {
-            size: 'invisible',
-            callback: () => {
-              console.log('reCAPTCHA solved');
-            }
-          },
-          this.auth
-        );
+        try {
+          console.log('Creating RecaptchaVerifier with auth:', this.auth);
+          // Try with normal size first to debug
+          this.recaptchaVerifier = new RecaptchaVerifier(
+            container,
+            {
+              size: 'normal', // Change to 'normal' to see if it renders
+              callback: (response) => {
+                console.log('reCAPTCHA solved:', response);
+              },
+              'expired-callback': () => {
+                console.log('reCAPTCHA expired');
+              }
+            },
+            this.auth
+          );
+          console.log('RecaptchaVerifier created successfully');
+        } catch (error) {
+          console.error('RecaptchaVerifier creation failed:', error);
+          throw error;
+        }
       }
 
       const phoneNumberFormatted = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
