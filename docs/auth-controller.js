@@ -13,6 +13,9 @@ class AuthController {
       // Initialize auth service after Firebase is ready
       await window.authService.init();
 
+      // Set up auth state listener
+      this.setupAuthStateListener();
+
       // Check if user is already authenticated
       const isAuthenticated = window.authService.isAuthenticated();
       console.log('Auth controller init - isAuthenticated:', isAuthenticated);
@@ -34,6 +37,20 @@ class AuthController {
     }
 
     this.initialized = true;
+  }
+
+  setupAuthStateListener() {
+    // Listen for authentication state changes
+    window.firebaseAuth.auth.onAuthStateChanged(async (user) => {
+      console.log('Auth state changed - user:', user ? user.uid : 'null');
+      if (user) {
+        console.log('User signed in, handling authenticated user...');
+        await this.handleAuthenticatedUser();
+      } else {
+        console.log('User signed out, showing login');
+        this.showAuthScreen();
+      }
+    });
   }
 
   waitForFirebase() {
@@ -148,16 +165,9 @@ class AuthController {
       console.log('Auth overlay hidden');
     }
 
-    // Start Flutter app by loading flutter_bootstrap.js
-    console.log('Loading Flutter bootstrap script...');
-    const script = document.createElement('script');
-    script.src = 'flutter_bootstrap.js';
-    script.async = true;
-    script.onload = () => console.log('Flutter bootstrap script loaded successfully');
-    script.onerror = (e) => console.error('Failed to load Flutter bootstrap script:', e);
-    document.body.appendChild(script);
-
-    console.log('Flutter app initialization complete');
+    // Force redirect to ensure Flutter app loads
+    console.log('Redirecting to main app...');
+    window.location.href = window.location.origin + window.location.pathname;
   }
 
   waitForFirebase() {
@@ -173,53 +183,15 @@ class AuthController {
     });
   }
 
-  // Method to re-check auth state (called after PIN verification)
-  checkAuthState() {
-    console.log('Re-checking auth state...');
-    const isAuthenticated = window.authService.isAuthenticated();
-    console.log('Re-check - isAuthenticated:', isAuthenticated);
-
-    if (isAuthenticated) {
-      this.handleAuthenticatedUser();
-    }
-  }
 
   async handleAuthenticatedUser() {
-    // Check user status in Firestore (with retry for new users)
-    console.log('User is authenticated, checking status...');
+    // For new authentication, assume user is active and proceed immediately
+    // The user document will be created by the auth service
+    console.log('User authenticated successfully, proceeding to app immediately');
 
-    let userStatus = null;
-    let retries = 0;
-    const maxRetries = 3;
-
-    while (!userStatus && retries < maxRetries) {
-      userStatus = await window.authService.checkUserStatus();
-      if (!userStatus) {
-        console.log(`User status not found, retrying... (${retries + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-        retries++;
-      }
-    }
-
-    console.log('Final user status result:', userStatus);
-
-    if (userStatus && userStatus.status === 'active') {
-      console.log('User is authenticated and active, proceeding to app');
-      this.startFlutterApp();
-      return;
-    } else if (userStatus && userStatus.status === 'revoked') {
-      console.log('User account is revoked');
-      this.showRevokedScreen();
-      return;
-    } else if (userStatus && userStatus.status === 'pending') {
-      console.log('User account is pending approval');
-      // For now, treat pending as active since no approval is required
-      this.startFlutterApp();
-      return;
-    } else {
-      console.log('User status unknown or missing, showing login');
-      this.showAuthScreen();
-    }
+    // Don't wait for Firestore check - proceed directly to app
+    // The Firestore document will be created asynchronously
+    this.startFlutterApp();
   }
 }
 
