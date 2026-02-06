@@ -46,16 +46,6 @@ class AuthService {
       }
     });
   }
-
-    onAuthStateChanged(auth, (user) => {
-      this.currentUser = user;
-      if (user) {
-        console.log('User signed in:', user.uid);
-        this.updateUserLastLogin(user.uid);
-      } else {
-        console.log('User signed out');
-      }
-    });
   }
 
   waitForFirebase() {
