@@ -46,7 +46,6 @@ class AuthService {
       }
     });
   }
-  }
 
   waitForFirebase() {
     return new Promise((resolve) => {
