@@ -29,9 +29,13 @@ import {
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
+console.log('Firebase config initializing...');
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+console.log('Firebase initialized:', { app, auth, db });
 
 // Export for use in other modules
 window.firebaseAuth = {
@@ -48,3 +52,5 @@ window.firebaseAuth = {
   updateDoc,
   serverTimestamp
 };
+
+console.log('window.firebaseAuth set:', window.firebaseAuth);
