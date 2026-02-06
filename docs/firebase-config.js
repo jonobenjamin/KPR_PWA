@@ -1,12 +1,13 @@
 // Firebase Configuration
-// Replace with your Firebase project config
+// Firebase project config from Firebase Console
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "your-app-id"
+  apiKey: "AIzaSyCHpJdRUch5Na_6HgM6dxgWxfoKeciPo_s",
+  authDomain: "wildlifetracker-4d28b.firebaseapp.com",
+  projectId: "wildlifetracker-4d28b",
+  storageBucket: "wildlifetracker-4d28b.firebasestorage.app",
+  messagingSenderId: "209541121506",
+  appId: "1:209541121506:web:7fe9890f91be06dc4ba5bb",
+  measurementId: "G-4XLR7JTEEH"
 };
 
 // Initialize Firebase
