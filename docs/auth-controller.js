@@ -6,9 +6,12 @@ class AuthController {
   }
 
   async init() {
+    // Wait for Firebase to be ready before proceeding
+    await this.waitForFirebase();
+
     try {
-      // Wait for Firebase to be ready
-      await this.waitForFirebase();
+      // Initialize auth service after Firebase is ready
+      await window.authService.init();
 
       // Check if user is already authenticated
       const isAuthenticated = window.authService.isAuthenticated();
@@ -156,6 +159,19 @@ class AuthController {
     script.src = 'flutter_bootstrap.js';
     script.async = true;
     document.body.appendChild(script);
+  }
+
+  waitForFirebase() {
+    return new Promise((resolve) => {
+      const checkFirebase = () => {
+        if (window.firebaseAuth && window.firebaseAuth.auth) {
+          resolve();
+        } else {
+          setTimeout(checkFirebase, 100);
+        }
+      };
+      checkFirebase();
+    });
   }
 }
 
