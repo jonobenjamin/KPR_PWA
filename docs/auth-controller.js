@@ -2,6 +2,7 @@
 class AuthController {
   constructor() {
     this.initialized = false;
+    this.flutterStarted = false;
     this.init();
   }
 
@@ -158,6 +159,13 @@ class AuthController {
   startFlutterApp() {
     console.log('🎯 STARTING FLUTTER APP - User is authenticated and active');
 
+    // Prevent multiple calls
+    if (this.flutterStarted) {
+      console.log('Flutter app already started, skipping');
+      return;
+    }
+    this.flutterStarted = true;
+
     // Hide auth overlay if it exists
     const overlay = document.getElementById('auth-overlay');
     if (overlay) {
@@ -165,9 +173,25 @@ class AuthController {
       console.log('Auth overlay hidden');
     }
 
-    // Force redirect to ensure Flutter app loads
-    console.log('Redirecting to main app...');
-    window.location.href = window.location.origin + window.location.pathname;
+    // Check if Flutter is already loaded
+    if (window.flutter_bootstrap) {
+      console.log('Flutter already loaded, skipping bootstrap');
+      return;
+    }
+
+    // Start Flutter app by loading flutter_bootstrap.js
+    console.log('Loading Flutter bootstrap script...');
+    const script = document.createElement('script');
+    script.src = 'flutter_bootstrap.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Flutter bootstrap script loaded successfully');
+      // Flutter should now initialize automatically
+    };
+    script.onerror = (e) => console.error('Failed to load Flutter bootstrap script:', e);
+    document.body.appendChild(script);
+
+    console.log('Flutter app initialization complete');
   }
 
   waitForFirebase() {
