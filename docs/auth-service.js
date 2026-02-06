@@ -67,7 +67,7 @@ class AuthService {
   // Email PIN Authentication
   async requestEmailPin(email, name) {
     try {
-      const response = await fetch('https://kpremailauth.vercel.app/api/auth/request-pin', {
+      const response = await fetch('https://wildlife-tracker-gxz5.vercel.app/api/auth/request-pin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,7 +89,7 @@ class AuthService {
 
   async verifyEmailPin(email, pin) {
     try {
-      const response = await fetch('https://kpremailauth.vercel.app/api/auth/verify-pin', {
+      const response = await fetch('https://wildlife-tracker-gxz5.vercel.app/api/auth/verify-pin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
