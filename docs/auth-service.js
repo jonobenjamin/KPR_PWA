@@ -1,8 +1,25 @@
 // Authentication Service
+// Import Firebase functions directly
+import {
+  signInWithCustomToken,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  signOut,
+  onAuthStateChanged,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
 class AuthService {
   constructor() {
     this.currentUser = null;
     this.recaptchaVerifier = null;
+    this.auth = null;
+    this.db = null;
     this.init();
   }
 
@@ -10,7 +27,25 @@ class AuthService {
     // Wait for Firebase to be ready
     await this.waitForFirebase();
 
-    const { auth, onAuthStateChanged } = window.firebaseAuth;
+    // Get Firebase instances from global
+    this.auth = window.firebaseAuth?.auth;
+    this.db = window.firebaseAuth?.db;
+
+    if (!this.auth) {
+      console.error('Firebase auth not available');
+      return;
+    }
+
+    onAuthStateChanged(this.auth, (user) => {
+      this.currentUser = user;
+      if (user) {
+        console.log('User signed in:', user.uid);
+        this.updateUserLastLogin(user.uid);
+      } else {
+        console.log('User signed out');
+      }
+    });
+  }
 
     onAuthStateChanged(auth, (user) => {
       this.currentUser = user;
@@ -26,7 +61,9 @@ class AuthService {
   waitForFirebase() {
     return new Promise((resolve) => {
       const checkFirebase = () => {
-        if (window.firebaseAuth && window.firebaseAuth.auth) {
+        if (window.firebaseAuth && window.firebaseAuth.auth && window.firebaseAuth.db) {
+          this.auth = window.firebaseAuth.auth;
+          this.db = window.firebaseAuth.db;
           resolve();
         } else {
           setTimeout(checkFirebase, 100);
@@ -75,10 +112,9 @@ class AuthService {
       }
 
       const data = await response.json();
-      const { signInWithCustomToken } = window.firebaseAuth;
 
       // Sign in with custom token
-      const result = await signInWithCustomToken(window.firebaseAuth.auth, data.customToken);
+      const result = await signInWithCustomToken(this.auth, data.customToken);
 
       // Create/update user document
       await this.createOrUpdateUser(result.user, { email, name: data.name });
@@ -93,9 +129,13 @@ class AuthService {
   // Phone Authentication
   async requestPhoneOtp(phoneNumber, name) {
     try {
+      if (!this.auth) {
+        throw new Error('Firebase auth not initialized');
+      }
+
       // Initialize reCAPTCHA if not already done
       if (!this.recaptchaVerifier) {
-        this.recaptchaVerifier = new window.firebaseAuth.RecaptchaVerifier(
+        this.recaptchaVerifier = new RecaptchaVerifier(
           'recaptcha-container',
           {
             size: 'invisible',
@@ -103,13 +143,13 @@ class AuthService {
               console.log('reCAPTCHA solved');
             }
           },
-          window.firebaseAuth.auth
+          this.auth
         );
       }
 
       const phoneNumberFormatted = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-      const confirmationResult = await window.firebaseAuth.signInWithPhoneNumber(
-        window.firebaseAuth.auth,
+      const confirmationResult = await signInWithPhoneNumber(
+        this.auth,
         phoneNumberFormatted,
         this.recaptchaVerifier
       );
@@ -161,8 +201,6 @@ class AuthService {
 
   // User Management
   async createOrUpdateUser(user, userData) {
-    const { doc, setDoc, updateDoc, serverTimestamp } = window.firebaseAuth;
-
     const userDoc = {
       name: userData.name,
       email: userData.email,
@@ -173,7 +211,7 @@ class AuthService {
     };
 
     try {
-      await setDoc(doc(window.firebaseAuth.db, 'users', user.uid), userDoc, { merge: true });
+      await setDoc(doc(this.db, 'users', user.uid), userDoc, { merge: true });
       console.log('User document created/updated:', user.uid);
     } catch (error) {
       console.error('Failed to create/update user document:', error);
@@ -182,10 +220,8 @@ class AuthService {
   }
 
   async updateUserLastLogin(uid) {
-    const { doc, updateDoc, serverTimestamp } = window.firebaseAuth;
-
     try {
-      await updateDoc(doc(window.firebaseAuth.db, 'users', uid), {
+      await updateDoc(doc(this.db, 'users', uid), {
         lastLogin: serverTimestamp()
       });
     } catch (error) {
@@ -196,10 +232,8 @@ class AuthService {
   async checkUserStatus() {
     if (!this.currentUser) return null;
 
-    const { doc, getDoc } = window.firebaseAuth;
-
     try {
-      const userDoc = await getDoc(doc(window.firebaseAuth.db, 'users', this.currentUser.uid));
+      const userDoc = await getDoc(doc(this.db, 'users', this.currentUser.uid));
       if (userDoc.exists()) {
         return userDoc.data();
       }
@@ -211,8 +245,7 @@ class AuthService {
   }
 
   async signOut() {
-    const { signOut } = window.firebaseAuth;
-    await signOut(window.firebaseAuth.auth);
+    await signOut(this.auth);
     this.currentUser = null;
   }
 
