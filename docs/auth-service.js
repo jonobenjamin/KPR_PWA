@@ -136,8 +136,13 @@ class AuthService {
 
       // Initialize reCAPTCHA if not already done
       if (!this.recaptchaVerifier) {
+        const container = document.getElementById('recaptcha-container');
+        if (!container) {
+          throw new Error('reCAPTCHA container not found');
+        }
+
         this.recaptchaVerifier = new RecaptchaVerifier(
-          'recaptcha-container',
+          container,
           {
             size: 'invisible',
             callback: () => {
