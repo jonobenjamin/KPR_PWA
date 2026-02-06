@@ -164,7 +164,7 @@ class AuthController {
   waitForFirebase() {
     return new Promise((resolve) => {
       const checkFirebase = () => {
-        if (window.firebaseAuth && window.firebaseAuth.auth) {
+        if (window.firebaseAuth && window.firebaseAuth.auth && window.firebaseAuth.db) {
           resolve();
         } else {
           setTimeout(checkFirebase, 100);
