@@ -298,6 +298,24 @@ class AuthService {
     }
   }
 
+  // Check if user is allowed to submit data (not revoked)
+  async canSubmitData() {
+    const userStatus = await this.checkUserStatus();
+    if (!userStatus) {
+      console.log('User status not found - allowing submission (new user)');
+      return true; // Allow new users to submit until status is set
+    }
+
+    const isActive = userStatus.status === 'active' || userStatus.status === undefined;
+    console.log('User submission check - status:', userStatus.status, 'allowed:', isActive);
+
+    if (!isActive) {
+      console.warn('🚫 REVOKED USER attempted to submit data - BLOCKED');
+    }
+
+    return isActive;
+  }
+
   async signOut() {
     await signOut(this.auth);
     this.currentUser = null;
