@@ -249,7 +249,10 @@ class AuthService {
     console.log('🔥 Auth instance available:', !!this.auth);
     console.log('🔥 Current user authenticated:', this.auth?.currentUser ? 'YES' : 'NO');
     console.log('🔥 Current user UID matches:', this.auth?.currentUser?.uid === user.uid ? 'YES' : 'NO');
-    console.log('🔥 Database being used:', this.db.app.options.projectId, 'database:', this.db._databaseId || 'default');
+      console.log('🔥 Database being used:', this.db.app.options.projectId, 'database:', this.db._databaseId || 'default');
+      console.log('🔥 Auth context - currentUser:', this.auth.currentUser ? 'EXISTS' : 'NULL');
+      console.log('🔥 Auth context - UID:', this.auth.currentUser?.uid);
+      console.log('🔥 Auth context - isAnonymous:', this.auth.currentUser?.isAnonymous);
 
     if (!this.db) {
       throw new Error('Firestore instance not available');
@@ -361,6 +364,28 @@ class AuthService {
       } catch (testError) {
         console.warn('⚠️ Firestore connectivity test failed:', testError.message);
         console.warn('⚠️ This suggests Firestore rules are not deployed correctly');
+
+        // Try to test with a simple write operation to see if auth works
+        console.log('🔍 Testing write permissions with observations collection...');
+        try {
+          // This should work if rules are deployed correctly
+          const testWriteRef = doc(this.db, 'observations', 'permission_test_' + Date.now());
+          await setDoc(testWriteRef, { test: true, timestamp: new Date() });
+          console.log('✅ Write permission test passed - rules are working');
+        } catch (writeError) {
+          console.error('❌ Write permission test failed:', writeError.message);
+          console.error('❌ Rules may not be deployed or auth context is wrong');
+
+          // Try health collection read (should always work)
+          console.log('🔍 Testing health collection read...');
+          try {
+            const healthDoc = await getDoc(doc(this.db, 'health', 'test'));
+            console.log('✅ Health collection accessible');
+          } catch (healthError) {
+            console.error('❌ Even health collection failed:', healthError.message);
+            console.error('❌ This suggests database connection or basic auth issues');
+          }
+        }
       }
 
       const userDoc = await getDoc(doc(this.db, 'users', this.currentUser.uid));
