@@ -145,13 +145,77 @@ class AuthService {
     }
   }
 
-  // Phone Authentication - Temporarily disabled due to Firebase config issues
+  // Phone Authentication
   async requestPhoneOtp(phoneNumber, name) {
-    console.log('Phone authentication is currently disabled due to Firebase configuration issues.');
-    console.log('Please use email authentication instead.');
+    try {
+      console.log('Requesting phone OTP for:', phoneNumber);
 
-    // Show user-friendly error
-    throw new Error('Phone authentication is temporarily unavailable. Please use email authentication.');
+      // Validate phone number format
+      const phoneRegex = /^\+[1-9]\d{1,14}$/;
+      if (!phoneRegex.test(phoneNumber)) {
+        throw new Error('Please enter a valid phone number with country code (e.g., +1234567890)');
+      }
+
+      // Initialize reCAPTCHA if not already done
+      if (!this.recaptchaVerifier) {
+        console.log('Setting up reCAPTCHA verifier...');
+
+        // Clear any existing reCAPTCHA
+        const container = document.getElementById('recaptcha-container');
+        if (container) {
+          container.innerHTML = '';
+        }
+
+        try {
+          this.recaptchaVerifier = new RecaptchaVerifier(this.auth, 'recaptcha-container', {
+            size: 'invisible',
+            callback: (response) => {
+              console.log('reCAPTCHA solved successfully');
+            },
+            'expired-callback': () => {
+              console.log('reCAPTCHA expired, will recreate on next attempt');
+              this.recaptchaVerifier = null;
+            },
+            'error-callback': (error) => {
+              console.error('reCAPTCHA error:', error);
+            }
+          });
+          console.log('reCAPTCHA verifier created successfully');
+        } catch (error) {
+          console.error('Failed to create reCAPTCHA verifier:', error);
+          throw new Error('Failed to initialize security verification. Please refresh the page and try again.');
+        }
+      }
+
+      console.log('Sending phone verification...');
+      this.confirmationResult = await signInWithPhoneNumber(this.auth, phoneNumber, this.recaptchaVerifier);
+
+      // Store user data for later use
+      sessionStorage.setItem('pendingPhoneUser', JSON.stringify({ name, phone: phoneNumber }));
+
+      console.log('Phone verification sent successfully');
+      return { success: true, message: 'SMS code sent to your phone' };
+
+    } catch (error) {
+      console.error('Phone OTP request failed:', error);
+
+      // Reset reCAPTCHA on error
+      if (this.recaptchaVerifier) {
+        this.recaptchaVerifier.clear();
+        this.recaptchaVerifier = null;
+      }
+
+      // Handle specific Firebase errors
+      if (error.code === 'auth/invalid-phone-number') {
+        throw new Error('Invalid phone number format. Please include country code (e.g., +1 for US).');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many requests. Please try again later.');
+      } else if (error.code === 'auth/missing-recaptcha-token') {
+        throw new Error('reCAPTCHA verification failed. Please refresh and try again.');
+      }
+
+      throw new Error(`Failed to send SMS: ${error.message}`);
+    }
   }
 
   async verifyPhoneOtp(otp) {
