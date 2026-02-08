@@ -534,7 +534,7 @@ class AuthUI {
   setLoading(buttonId, loading) {
     const button = document.getElementById(buttonId);
     if (!button) {
-      console.warn(`Button with ID ${buttonId} not found`);
+      console.warn(`Button with ID ${buttonId} not found - form may have changed`);
       return;
     }
 
@@ -553,7 +553,11 @@ class AuthUI {
       } else if (buttonId.includes('otp-submit')) {
         button.textContent = 'Verify Code';
       } else {
-        button.textContent = button.textContent.replace('Please wait...', '').trim();
+        // Fallback: try to restore original text
+        const currentText = button.textContent;
+        if (currentText.includes('Please wait...')) {
+          button.textContent = currentText.replace('Please wait...', '').trim();
+        }
       }
     }
   }
