@@ -18,14 +18,14 @@ class AuthUI {
     container.innerHTML = `
       <div id="auth-container">
         <div id="auth-header">
-          <h2>Sign In to Wildlife Tracker</h2>
+          <h2>Sign In to KPR Monitoring</h2>
         </div>
         <div id="auth-content"></div>
         <div id="recaptcha-container"></div>
       </div>
     `;
 
-    // Add styles
+    // Add styles - Mobile-first responsive design
     const style = document.createElement('style');
     style.textContent = `
       #auth-overlay {
@@ -40,16 +40,21 @@ class AuthUI {
         align-items: center;
         z-index: 9999;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 16px; /* Add padding for mobile safe areas */
+        box-sizing: border-box;
       }
 
       #auth-container {
         background: white;
-        border-radius: 12px;
-        padding: 24px;
+        border-radius: 16px; /* More rounded on mobile */
+        padding: 20px;
         max-width: 400px;
-        width: 90%;
+        width: 100%; /* Full width on mobile */
+        max-height: 90vh; /* Prevent overflow on small screens */
+        overflow-y: auto; /* Allow scrolling if needed */
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         animation: slideUp 0.3s ease-out;
+        margin: auto; /* Center properly */
       }
 
       @keyframes slideUp {
@@ -58,16 +63,18 @@ class AuthUI {
       }
 
       #auth-header h2 {
-        margin: 0 0 20px 0;
+        margin: 0 0 24px 0;
         color: #333;
-        font-size: 24px;
+        font-size: 22px; /* Slightly smaller for mobile */
+        font-weight: 600;
         text-align: center;
+        line-height: 1.3;
       }
 
       .auth-form {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 20px; /* More spacing on mobile */
       }
 
       .form-group {
@@ -79,82 +86,125 @@ class AuthUI {
       .form-group label {
         font-weight: 500;
         color: #555;
-        font-size: 14px;
+        font-size: 16px; /* Larger for mobile readability */
+        margin-bottom: 4px;
       }
 
       .form-group input {
-        padding: 12px 16px;
+        padding: 16px 18px; /* Larger touch targets */
         border: 2px solid #e1e5e9;
-        border-radius: 8px;
-        font-size: 16px;
+        border-radius: 12px; /* More rounded */
+        font-size: 16px; /* Prevent zoom on iOS */
         transition: border-color 0.2s;
+        width: 100%;
+        box-sizing: border-box;
+        background: #fafafa; /* Light background for better contrast */
       }
 
       .form-group input:focus {
         outline: none;
         border-color: #007aff;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1); /* Focus ring */
+      }
+
+      .form-group input::placeholder {
+        color: #999;
+        font-size: 16px;
       }
 
       .auth-button {
-        background: #007aff;
+        background: linear-gradient(135deg, #007aff, #0056cc); /* Gradient for modern look */
         color: white;
         border: none;
-        padding: 14px;
-        border-radius: 8px;
+        padding: 16px 20px; /* Larger touch targets */
+        border-radius: 12px;
         font-size: 16px;
         font-weight: 600;
         cursor: pointer;
-        transition: background 0.2s;
+        transition: all 0.2s;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 48px; /* Minimum touch target size */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
       }
 
       .auth-button:hover {
-        background: #0056cc;
+        background: linear-gradient(135deg, #0056cc, #004499);
+        transform: translateY(-1px);
+      }
+
+      .auth-button:active {
+        transform: translateY(0);
       }
 
       .auth-button:disabled {
         background: #ccc;
         cursor: not-allowed;
+        transform: none;
       }
 
       .auth-button.secondary {
-        background: #f0f0f0;
+        background: #f8f9fa;
         color: #333;
+        border: 2px solid #e9ecef;
       }
 
       .auth-button.secondary:hover {
-        background: #e0e0e0;
+        background: #e9ecef;
+        border-color: #dee2e6;
       }
 
       .auth-links {
         display: flex;
         justify-content: center;
-        gap: 16px;
-        margin-top: 20px;
+        gap: 24px; /* More spacing */
+        margin-top: 24px;
+        flex-wrap: wrap; /* Wrap on small screens */
       }
 
       .auth-link {
         color: #007aff;
         text-decoration: none;
-        font-size: 14px;
+        font-size: 16px; /* Larger for mobile */
+        font-weight: 500;
         cursor: pointer;
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: background 0.2s;
+        min-height: 44px; /* Touch target size */
+        display: flex;
+        align-items: center;
       }
 
       .auth-link:hover {
-        text-decoration: underline;
+        background: rgba(0, 122, 255, 0.1);
+        text-decoration: none;
       }
 
       .error-message {
         color: #dc3545;
-        font-size: 14px;
-        margin-top: 8px;
+        font-size: 15px; /* Larger for mobile */
+        margin-top: 12px;
         text-align: center;
+        padding: 12px;
+        background: #f8d7da;
+        border-radius: 8px;
+        border: 1px solid #f5c6cb;
       }
 
       .success-message {
         color: #28a745;
-        font-size: 14px;
-        margin-top: 8px;
+        font-size: 15px;
+        margin-top: 12px;
         text-align: center;
+        padding: 12px;
+        background: #d4edda;
+        border-radius: 8px;
+        border: 1px solid #c3e6cb;
       }
 
       .loading {
@@ -171,6 +221,59 @@ class AuthUI {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+
+      /* Mobile-specific adjustments */
+      @media (max-width: 480px) {
+        #auth-overlay {
+          padding: 12px;
+        }
+
+        #auth-container {
+          padding: 16px;
+          border-radius: 12px;
+        }
+
+        #auth-header h2 {
+          font-size: 20px;
+          margin-bottom: 20px;
+        }
+
+        .auth-form {
+          gap: 16px;
+        }
+
+        .form-group input {
+          padding: 14px 16px;
+        }
+
+        .auth-button {
+          padding: 14px 18px;
+          min-height: 44px;
+        }
+
+        .auth-links {
+          gap: 16px;
+          margin-top: 20px;
+        }
+
+        .auth-link {
+          font-size: 15px;
+          padding: 6px 10px;
+          min-height: 40px;
+        }
+      }
+
+      /* Ensure proper viewport handling */
+      @media (max-height: 600px) {
+        #auth-container {
+          max-height: 95vh;
+          margin: 8px auto;
+        }
+
+        #auth-overlay {
+          padding: 8px;
+        }
+      }
     `;
 
     document.head.appendChild(style);
@@ -181,14 +284,14 @@ class AuthUI {
     this.currentStep = 'login-type';
     const content = document.getElementById('auth-content');
     content.innerHTML = `
-      <div class="auth-form">
-        <button class="auth-button" onclick="window.authUI.showEmailForm()">
-          📧 Sign in with Email
-        </button>
-        <button class="auth-button secondary" onclick="window.authUI.showPhoneForm()">
-          📱 Sign in with Phone
-        </button>
-      </div>
+        <div class="auth-form">
+          <button class="auth-button" onclick="window.authUI.showEmailForm()">
+            📧 Sign in with Email
+          </button>
+          <button class="auth-button secondary" disabled style="opacity: 0.5; cursor: not-allowed;" title="Phone authentication temporarily disabled">
+            📱 Phone (Coming Soon)
+          </button>
+        </div>
     `;
   }
 
