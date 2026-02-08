@@ -352,13 +352,14 @@ class AuthService {
     if (!this.currentUser) return null;
 
     try {
-      // First test if we can read from observations collection (should work)
+      // First test if we can read from health collection (should always work)
       console.log('🔍 Testing Firestore connectivity...');
       try {
-        const testDoc = await getDoc(doc(this.db, 'observations', 'test_' + Date.now()));
+        const testDoc = await getDoc(doc(this.db, 'health', 'connectivity_test'));
         console.log('✅ Firestore connectivity test passed');
       } catch (testError) {
         console.warn('⚠️ Firestore connectivity test failed:', testError.message);
+        console.warn('⚠️ This suggests Firestore rules are not deployed correctly');
       }
 
       const userDoc = await getDoc(doc(this.db, 'users', this.currentUser.uid));
