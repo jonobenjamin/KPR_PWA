@@ -243,11 +243,12 @@ class AuthService {
   // User Management
   async createOrUpdateUser(user, userData) {
     console.log('🔥 STARTING createOrUpdateUser method');
-    console.log('🔥 User object:', { uid: user.uid, email: user.email });
+    console.log('🔥 User object:', { uid: user.uid, email: user.email, phone: user.phoneNumber });
     console.log('🔥 UserData:', userData);
     console.log('🔥 Firestore instance available:', !!this.db);
     console.log('🔥 Auth instance available:', !!this.auth);
     console.log('🔥 Current user authenticated:', this.auth?.currentUser ? 'YES' : 'NO');
+    console.log('🔥 Current user UID matches:', this.auth?.currentUser?.uid === user.uid ? 'YES' : 'NO');
 
     if (!this.db) {
       throw new Error('Firestore instance not available');
@@ -351,13 +352,25 @@ class AuthService {
     if (!this.currentUser) return null;
 
     try {
+      // First test if we can read from observations collection (should work)
+      console.log('🔍 Testing Firestore connectivity...');
+      try {
+        const testDoc = await getDoc(doc(this.db, 'observations', 'test_' + Date.now()));
+        console.log('✅ Firestore connectivity test passed');
+      } catch (testError) {
+        console.warn('⚠️ Firestore connectivity test failed:', testError.message);
+      }
+
       const userDoc = await getDoc(doc(this.db, 'users', this.currentUser.uid));
       if (userDoc.exists()) {
+        console.log('✅ User document found:', userDoc.id);
         return userDoc.data();
       }
+      console.log('⚠️ User document not found:', this.currentUser.uid);
       return null;
     } catch (error) {
-      console.error('Failed to check user status:', error);
+      console.error('❌ Failed to check user status:', error);
+      console.error('❌ Error details:', error.code, error.message);
       return null;
     }
   }
