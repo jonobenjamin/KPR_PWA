@@ -288,8 +288,8 @@ class AuthUI {
           <button class="auth-button" onclick="window.authUI.showEmailForm()">
             📧 Sign in with Email
           </button>
-          <button class="auth-button secondary" disabled style="opacity: 0.5; cursor: not-allowed;" title="Phone authentication temporarily disabled">
-            📱 Phone (Coming Soon)
+          <button class="auth-button" onclick="window.authUI.showPhoneForm()">
+            📱 Sign in with Phone
           </button>
         </div>
     `;
@@ -472,6 +472,13 @@ class AuthUI {
       return;
     }
 
+    // Validate phone number format
+    const phoneRegex = /^\+[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(phone)) {
+      this.showMessage('phone-message', 'Please enter a valid phone number with country code (e.g., +1234567890)', 'error');
+      return;
+    }
+
     this.setLoading('phone-submit-btn', true);
 
     try {
@@ -480,6 +487,7 @@ class AuthUI {
       this.showMessage('phone-message', result.message, 'success');
       this.showPhoneOtpForm();
     } catch (error) {
+      console.error('Phone auth error:', error);
       this.showMessage('phone-message', error.message, 'error');
     } finally {
       this.setLoading('phone-submit-btn', false);
