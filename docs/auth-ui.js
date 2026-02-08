@@ -533,12 +533,28 @@ class AuthUI {
 
   setLoading(buttonId, loading) {
     const button = document.getElementById(buttonId);
+    if (!button) {
+      console.warn(`Button with ID ${buttonId} not found`);
+      return;
+    }
+
     if (loading) {
       button.disabled = true;
       button.innerHTML = '<span class="loading"></span> Please wait...';
     } else {
       button.disabled = false;
-      button.textContent = button.textContent.replace('Please wait...', '').trim();
+      // Restore original text based on button type
+      if (buttonId.includes('email-submit')) {
+        button.textContent = 'Send PIN Code';
+      } else if (buttonId.includes('pin-submit')) {
+        button.textContent = 'Verify PIN';
+      } else if (buttonId.includes('phone-submit')) {
+        button.textContent = 'Send OTP';
+      } else if (buttonId.includes('otp-submit')) {
+        button.textContent = 'Verify Code';
+      } else {
+        button.textContent = button.textContent.replace('Please wait...', '').trim();
+      }
     }
   }
 
