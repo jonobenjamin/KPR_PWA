@@ -249,6 +249,7 @@ class AuthService {
     console.log('🔥 Auth instance available:', !!this.auth);
     console.log('🔥 Current user authenticated:', this.auth?.currentUser ? 'YES' : 'NO');
     console.log('🔥 Current user UID matches:', this.auth?.currentUser?.uid === user.uid ? 'YES' : 'NO');
+    console.log('🔥 Database being used:', this.db.app.options.projectId, 'database:', this.db._databaseId || 'default');
 
     if (!this.db) {
       throw new Error('Firestore instance not available');
