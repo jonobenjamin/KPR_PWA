@@ -1,120 +1,122 @@
-// Authentication controller
+// Authentication Controller - Main entry point
 class AuthController {
   constructor() {
-    this.auth = window.firebaseAuth;
-    this.authUI = window.authUI;
-    this.authService = window.authService;
+    this.flutterStarted = false;
   }
 
-  init() {
-    // Check if user is already authenticated (offline support)
-    const isAuthenticated = localStorage.getItem('userAuthenticated') === 'true';
+  async init() {
+    console.log('Auth controller initializing...');
 
-    if (isAuthenticated) {
-      // User was previously authenticated, start Flutter app directly
+    // Check if we have a previously authenticated user stored locally
+    const storedAuth = localStorage.getItem('userAuthenticated');
+    const storedUserName = localStorage.getItem('authenticatedUserName');
+
+    if (storedAuth === 'true' && storedUserName) {
+      console.log('Found previously authenticated user, proceeding offline:', storedUserName);
       this.startFlutterApp();
       return;
     }
 
-    // Check if email link sign-in
-    if (this.auth.isSignInWithEmailLink(window.location.href)) {
-      this.handleEmailLinkSignIn();
-    } else {
-      // Show authentication UI
-      this.showAuthUI();
-    }
-  }
+    // Wait for auth services to be ready
+    await this.waitForServices();
+    console.log('Auth services ready');
 
-  async handleEmailLinkSignIn() {
-    let email = localStorage.getItem('emailForSignIn');
+    // Check if user is already authenticated
+    const isAuthenticated = window.authService.isAuthenticated();
+    console.log('Auth controller init - isAuthenticated:', isAuthenticated);
 
-    if (!email) {
-      email = window.prompt('Please provide your email for confirmation');
+    if (isAuthenticated) {
+      console.log('User already authenticated, proceeding to app');
+      this.startFlutterApp();
+      return;
     }
 
-    try {
-      const result = await this.auth.signInWithEmailLink(email, window.location.href);
-      localStorage.removeItem('emailForSignIn');
-
-      // Create or update user
-      const userResult = await this.authService.createOrUpdateUser({
-        name: email.split('@')[0], // Use email prefix as name
-        email: email
-      });
-
-      if (userResult.success) {
-        this.handleAuthenticatedUser(userResult.user);
-      } else {
-        throw new Error(userResult.error);
-      }
-    } catch (error) {
-      console.error('Email link sign-in failed:', error);
-      alert('Sign-in failed. Please try again.');
-      this.showAuthUI();
-    }
+    // User is not authenticated, auth UI should already be showing
+    console.log('User not authenticated - auth UI should be visible');
   }
 
-  showAuthUI() {
-    this.authUI.showEmailForm();
+  waitForServices() {
+    return new Promise((resolve) => {
+      const checkServices = () => {
+        if (window.firebaseAuth && window.authService && window.authUI) {
+          resolve();
+        } else {
+          setTimeout(checkServices, 100);
+        }
+      };
+      checkServices();
+    });
   }
 
-  handleAuthenticatedUser(user) {
-    // Mark as authenticated for offline support
-    localStorage.setItem('userAuthenticated', 'true');
-
-    // Hide auth UI and start Flutter app
-    this.authUI.hide();
-    this.startFlutterApp();
-  }
-
-  startFlutterApp() {
-    // Start the Flutter app
-    console.log('Starting Flutter app...');
-
-    // The Flutter app will be initialized by flutter_bootstrap.js
-    // This function is called when authentication is complete
+  showAuthScreen() {
+    // Auth UI is already initialized and showing, nothing to do
+    console.log('Auth screen should already be visible');
   }
 
   showOfflineMessage() {
-    // Show message when offline but previously authenticated
-    const message = document.createElement('div');
-    message.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      text-align: center;
-      z-index: 10000;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    `;
-    message.innerHTML = `
-      <h2 style="margin-bottom: 1rem; color: #333;">Offline Mode</h2>
-      <p style="margin-bottom: 1.5rem; color: #666;">You are offline but previously authenticated.<br>Loading app...</p>
-      <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-      <style>
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      </style>
+    const container = document.createElement('div');
+    container.id = 'auth-overlay';
+    container.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="background: white; border-radius: 16px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); text-align: center;">
+          <h2 style="margin: 0 0 20px 0; color: #333; font-size: 24px;">KPR Monitoring App</h2>
+          <div style="font-size: 48px; margin-bottom: 20px;">📱</div>
+          <p style="color: #666; margin-bottom: 20px; font-size: 16px;">
+            You're currently offline. This app requires an internet connection for initial setup and authentication.
+          </p>
+          <p style="color: #666; margin-bottom: 30px; font-size: 14px;">
+            Please connect to the internet and try again.
+          </p>
+          <button onclick="window.location.reload()" style="background: linear-gradient(135deg, #007aff, #0056cc); color: white; border: none; padding: 16px 20px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; box-sizing: border-box; min-height: 48px;">
+            Retry Connection
+          </button>
+        </div>
+      </div>
     `;
 
-    document.body.appendChild(message);
-
-    // Auto-start Flutter app after showing message
-    setTimeout(() => {
-      message.remove();
-      this.startFlutterApp();
-    }, 2000);
+    document.body.appendChild(container);
   }
+
+
+  startFlutterApp() {
+    console.log('🎯 STARTING FLUTTER APP - User is authenticated');
+
+    // Prevent multiple calls
+    if (this.flutterStarted) {
+      console.log('Flutter app already started, skipping');
+      return;
+    }
+    this.flutterStarted = true;
+
+    // Hide auth overlay if it exists
+    const overlay = document.getElementById('auth-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      console.log('Auth overlay hidden');
+    }
+
+    // Load Flutter app
+    console.log('Loading Flutter bootstrap script...');
+    const script = document.createElement('script');
+    script.src = 'flutter_bootstrap.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Flutter bootstrap script loaded successfully');
+    };
+    script.onerror = (e) => console.error('Failed to load Flutter bootstrap script:', e);
+    document.body.appendChild(script);
+
+    console.log('Flutter app initialization complete');
+  }
+
+
+
 }
 
-// Initialize authentication when DOM is loaded
+// Initialize auth controller when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   window.authController = new AuthController();
-  window.authController.init();
 });
+
+// Export for use in other scripts
+window.AuthController = AuthController;
