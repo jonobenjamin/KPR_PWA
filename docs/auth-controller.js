@@ -20,9 +20,7 @@ class AuthController {
 
     if (storedAuth === 'true' && storedUserName) {
       console.log('Found previously authenticated user:', storedUserName, '- starting Flutter directly');
-      // Show a brief loading message before starting Flutter
-      this.showReturningUserMessage(storedUserName);
-      setTimeout(() => this.startFlutterApp(), 1500);
+      this.startFlutterApp();
       return;
     }
 
@@ -126,18 +124,18 @@ class AuthController {
       console.log('Auth overlay hidden');
     }
 
-    // Load Flutter app
-    console.log('Loading Flutter bootstrap script...');
-    const script = document.createElement('script');
-    script.src = 'flutter_bootstrap.js';
-    script.async = true;
-    script.onload = () => {
-      console.log('Flutter bootstrap script loaded successfully');
-    };
-    script.onerror = (e) => console.error('Failed to load Flutter bootstrap script:', e);
-    document.body.appendChild(script);
-
-    console.log('Flutter app initialization complete');
+    // Start Flutter app - bootstrap script should already be loaded
+    console.log('Starting Flutter app - calling loader...');
+    if (window._flutter && window._flutter.loader) {
+      window._flutter.loader.load({
+        serviceWorkerSettings: {
+          serviceWorkerVersion: "3967701479"
+        }
+      });
+      console.log('Flutter loader called successfully');
+    } else {
+      console.error('Flutter loader not available');
+    }
   }
 
 
