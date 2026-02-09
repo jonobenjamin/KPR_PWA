@@ -135,6 +135,10 @@ class AuthService {
         // Don't throw here - continue with authentication even if user doc fails
       }
 
+      // Store authentication state for offline use
+      localStorage.setItem('userAuthenticated', 'true');
+      localStorage.setItem('authenticatedUserName', data.name);
+
       // Auth controller will automatically detect the sign-in via onAuthStateChanged listener
       console.log('PIN verification complete - auth state listener will handle the rest');
 
@@ -231,6 +235,10 @@ class AuthService {
       if (pendingUserData) {
         await this.createOrUpdateUser(result.user, pendingUserData);
         sessionStorage.removeItem('pendingPhoneUser');
+
+        // Store authentication state for offline use
+        localStorage.setItem('userAuthenticated', 'true');
+        localStorage.setItem('authenticatedUserName', pendingUserData.name);
       }
 
       return { success: true, user: result.user };
@@ -382,6 +390,9 @@ class AuthService {
   async signOut() {
     await signOut(this.auth);
     this.currentUser = null;
+    // Clear offline authentication state
+    localStorage.removeItem('userAuthenticated');
+    localStorage.removeItem('authenticatedUserName');
   }
 
   isAuthenticated() {
