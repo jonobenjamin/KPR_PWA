@@ -8,7 +8,7 @@ class AuthUI {
 
   init() {
     this.createAuthContainer();
-    this.showLoginTypeSelection();
+    // Don't show login selection automatically - let auth controller decide
   }
 
   createAuthContainer() {
@@ -601,5 +601,7 @@ class AuthUI {
   }
 }
 
-// Create global instance
+// Create global instance but don't show UI automatically
+// The auth controller will decide whether to show auth UI or go directly to Flutter
 window.authUI = new AuthUI();
+// Don't call init() automatically - let auth controller control this
