@@ -19,7 +19,9 @@ class AuthController {
 
     if (storedAuth === 'true' && storedUserName) {
       console.log('Found previously authenticated user:', storedUserName, '- starting Flutter directly');
-      this.startFlutterApp();
+      // Show a brief loading message before starting Flutter
+      this.showReturningUserMessage(storedUserName);
+      setTimeout(() => this.startFlutterApp(), 1500);
       return;
     }
 
@@ -54,6 +56,31 @@ class AuthController {
   showAuthScreen() {
     // Auth UI is already initialized and showing, nothing to do
     console.log('Auth screen should already be visible');
+  }
+
+  showReturningUserMessage(userName) {
+    const container = document.createElement('div');
+    container.id = 'auth-overlay';
+    container.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="background: white; border-radius: 16px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); text-align: center;">
+          <h2 style="margin: 0 0 20px 0; color: #333; font-size: 24px;">Welcome back, ${userName}!</h2>
+          <div style="font-size: 48px; margin-bottom: 20px;">👋</div>
+          <p style="color: #666; margin-bottom: 20px; font-size: 16px;">
+            Loading your KPR Monitoring workspace...
+          </p>
+          <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007aff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+          <style>
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          </style>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(container);
   }
 
   showOfflineMessage() {
