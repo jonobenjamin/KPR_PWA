@@ -1,120 +1,318 @@
-// Authentication controller
+// Authentication Controller - Main entry point
 class AuthController {
   constructor() {
-    this.auth = window.firebaseAuth;
-    this.authUI = window.authUI;
-    this.authService = window.authService;
+    this.initialized = false;
+    this.flutterStarted = false;
+    this.init();
   }
 
-  init() {
-    // Check if user is already authenticated (offline support)
-    const isAuthenticated = localStorage.getItem('userAuthenticated') === 'true';
+  async init() {
+    // Check if we have a previously authenticated user stored locally
+    const storedAuth = localStorage.getItem('userAuthenticated');
+    const storedUserName = localStorage.getItem('authenticatedUserName');
 
-    if (isAuthenticated) {
-      // User was previously authenticated, start Flutter app directly
+    if (storedAuth === 'true' && storedUserName) {
+      console.log('Found previously authenticated user, proceeding offline:', storedUserName);
+      // Skip Firebase initialization for offline mode
       this.startFlutterApp();
+      this.initialized = true;
       return;
     }
 
-    // Check if email link sign-in
-    if (this.auth.isSignInWithEmailLink(window.location.href)) {
-      this.handleEmailLinkSignIn();
-    } else {
-      // Show authentication UI
-      this.showAuthUI();
-    }
-  }
-
-  async handleEmailLinkSignIn() {
-    let email = localStorage.getItem('emailForSignIn');
-
-    if (!email) {
-      email = window.prompt('Please provide your email for confirmation');
-    }
-
+    // Online authentication flow
     try {
-      const result = await this.auth.signInWithEmailLink(email, window.location.href);
-      localStorage.removeItem('emailForSignIn');
+      // Wait for Firebase to be ready before proceeding
+      await this.waitForFirebase();
 
-      // Create or update user
-      const userResult = await this.authService.createOrUpdateUser({
-        name: email.split('@')[0], // Use email prefix as name
-        email: email
-      });
+      // Initialize auth service after Firebase is ready
+      await window.authService.init();
 
-      if (userResult.success) {
-        this.handleAuthenticatedUser(userResult.user);
-      } else {
-        throw new Error(userResult.error);
+      // Set up auth state listener
+      this.setupAuthStateListener();
+
+      // Check if user is already authenticated
+      const isAuthenticated = window.authService.isAuthenticated();
+      console.log('Auth controller init - isAuthenticated:', isAuthenticated);
+      console.log('Auth controller init - currentUser:', window.authService.currentUser);
+
+      if (isAuthenticated) {
+        await this.handleAuthenticatedUser();
+        return;
       }
+
+      // Show authentication UI
+      console.log('User not authenticated or status check failed, showing login');
+      this.showAuthScreen();
+
     } catch (error) {
-      console.error('Email link sign-in failed:', error);
-      alert('Sign-in failed. Please try again.');
-      this.showAuthUI();
+      console.error('Auth initialization failed (likely offline):', error);
+      // If Firebase fails to load (likely offline), show a message
+      this.showOfflineMessage();
     }
+
+    this.initialized = true;
   }
 
-  showAuthUI() {
-    this.authUI.showEmailForm();
+  setupAuthStateListener() {
+    // Listen for authentication state changes
+    window.firebaseAuth.auth.onAuthStateChanged(async (user) => {
+      console.log('Auth state changed - user:', user ? user.uid : 'null');
+      if (user) {
+        console.log('User signed in, handling authenticated user...');
+        await this.handleAuthenticatedUser();
+      } else {
+        console.log('User signed out, showing login');
+        this.showAuthScreen();
+      }
+    });
   }
 
-  handleAuthenticatedUser(user) {
-    // Mark as authenticated for offline support
-    localStorage.setItem('userAuthenticated', 'true');
-
-    // Hide auth UI and start Flutter app
-    this.authUI.hide();
-    this.startFlutterApp();
+  waitForFirebase() {
+    return new Promise((resolve) => {
+      const checkFirebase = () => {
+        if (window.firebaseAuth && window.authService) {
+          resolve();
+        } else {
+          setTimeout(checkFirebase, 100);
+        }
+      };
+      checkFirebase();
+    });
   }
 
-  startFlutterApp() {
-    // Start the Flutter app
-    console.log('Starting Flutter app...');
-
-    // The Flutter app will be initialized by flutter_bootstrap.js
-    // This function is called when authentication is complete
+  showAuthScreen() {
+    // Auth UI is already initialized, just make sure it's visible
+    window.authUI.showAuthOverlay();
   }
 
   showOfflineMessage() {
-    // Show message when offline but previously authenticated
-    const message = document.createElement('div');
-    message.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: white;
-      padding: 2rem;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      text-align: center;
-      z-index: 10000;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    const container = document.getElementById('auth-overlay') || document.createElement('div');
+    container.id = 'auth-overlay';
+    container.innerHTML = `
+      <div id="auth-container">
+        <div id="auth-header">
+          <h2>KPR Monitoring App</h2>
+        </div>
+        <div id="auth-content">
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 48px; margin-bottom: 20px;">📱</div>
+            <p style="color: #666; margin-bottom: 20px; font-size: 16px;">
+              You're currently offline. This app requires an internet connection for initial setup and authentication.
+            </p>
+            <p style="color: #666; margin-bottom: 30px; font-size: 14px;">
+              Please connect to the internet and try again.
+            </p>
+            <button class="auth-button" onclick="window.location.reload()" style="background: #007aff;">
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      </div>
     `;
-    message.innerHTML = `
-      <h2 style="margin-bottom: 1rem; color: #333;">Offline Mode</h2>
-      <p style="margin-bottom: 1.5rem; color: #666;">You are offline but previously authenticated.<br>Loading app...</p>
-      <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-      <style>
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+
+    // Add styles
+    const style = document.createElement('style');
+    style.textContent = `
+      #auth-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      #auth-container {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      }
+      #auth-header h2 {
+        margin: 0 0 20px 0;
+        color: #333;
+        font-size: 24px;
+        text-align: center;
+      }
+      .auth-button {
+        background: linear-gradient(135deg, #007aff, #0056cc);
+        color: white;
+        border: none;
+        padding: 16px 20px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 48px;
+      }
+    `;
+
+    document.head.appendChild(style);
+    document.body.appendChild(container);
+  }
+
+  showRevokedScreen() {
+    const container = document.getElementById('auth-overlay') || document.createElement('div');
+    container.id = 'auth-overlay';
+    container.innerHTML = `
+      <div id="auth-container">
+        <div id="auth-header">
+          <h2>Access Revoked</h2>
+        </div>
+        <div id="auth-content">
+          <div style="text-align: center; padding: 20px;">
+            <p style="color: #dc3545; margin-bottom: 20px;">
+              Your account has been suspended by an administrator.
+            </p>
+            <p style="color: #666; font-size: 14px;">
+              Please contact support for assistance.
+            </p>
+            <button class="auth-button secondary" onclick="window.authController.signOutAndReload()" style="margin-top: 20px;">
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (!document.getElementById('auth-overlay')) {
+      document.body.appendChild(container);
+    }
+
+    // Add styles if not already present
+    if (!document.getElementById('auth-styles')) {
+      const style = document.createElement('style');
+      style.id = 'auth-styles';
+      style.textContent = `
+        #auth-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.8);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 9999;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-      </style>
-    `;
+        #auth-container {
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        #auth-header h2 {
+          margin: 0 0 20px 0;
+          color: #333;
+          font-size: 24px;
+          text-align: center;
+        }
+        .auth-button.secondary {
+          background: #f0f0f0;
+          color: #333;
+          border: none;
+          padding: 14px;
+          border-radius: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .auth-button.secondary:hover {
+          background: #e0e0e0;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }
 
-    document.body.appendChild(message);
+  async signOutAndReload() {
+    await window.authService.signOut();
+    window.location.reload();
+  }
 
-    // Auto-start Flutter app after showing message
-    setTimeout(() => {
-      message.remove();
-      this.startFlutterApp();
-    }, 2000);
+  startFlutterApp() {
+    console.log('🎯 STARTING FLUTTER APP - User is authenticated and active');
+
+    // Prevent multiple calls
+    if (this.flutterStarted) {
+      console.log('Flutter app already started, skipping');
+      return;
+    }
+    this.flutterStarted = true;
+
+    // Hide auth overlay if it exists
+    const overlay = document.getElementById('auth-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      console.log('Auth overlay hidden');
+    }
+
+    // Check if Flutter is already loaded
+    if (window.flutter_bootstrap) {
+      console.log('Flutter already loaded, skipping bootstrap');
+      return;
+    }
+
+    // Start Flutter app by loading flutter_bootstrap.js
+    console.log('Loading Flutter bootstrap script...');
+    const script = document.createElement('script');
+    script.src = 'flutter_bootstrap.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Flutter bootstrap script loaded successfully');
+      // Flutter should now initialize automatically
+    };
+    script.onerror = (e) => console.error('Failed to load Flutter bootstrap script:', e);
+    document.body.appendChild(script);
+
+    console.log('Flutter app initialization complete');
+  }
+
+  waitForFirebase() {
+    return new Promise((resolve) => {
+      const checkFirebase = () => {
+        if (window.firebaseAuth && window.firebaseAuth.auth && window.firebaseAuth.db) {
+          resolve();
+        } else {
+          setTimeout(checkFirebase, 100);
+        }
+      };
+      checkFirebase();
+    });
+  }
+
+
+  async handleAuthenticatedUser() {
+    // For new authentication, assume user is active and proceed immediately
+    // The user document will be created by the auth service
+    console.log('User authenticated successfully, proceeding to app immediately');
+
+    // Store authentication state locally for offline access
+    localStorage.setItem('userAuthenticated', 'true');
+
+    // Don't wait for Firestore check - proceed directly to app
+    // The Firestore document will be created asynchronously
+    this.startFlutterApp();
   }
 }
 
-// Initialize authentication when DOM is loaded
+// Initialize auth controller when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   window.authController = new AuthController();
-  window.authController.init();
 });
+
+// Export for use in other scripts
+window.AuthController = AuthController;
