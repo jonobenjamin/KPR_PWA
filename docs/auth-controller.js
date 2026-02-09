@@ -17,8 +17,7 @@ class AuthController {
 
     if (storedAuth === 'true' && storedUserName) {
       console.log('Found previously authenticated user:', storedUserName);
-      // Still show auth UI but user can choose to skip or re-auth
-      console.log('Auth UI should be visible (can skip for offline access)');
+      this.startFlutterApp();
       return;
     }
 
