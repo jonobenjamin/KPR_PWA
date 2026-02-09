@@ -2,6 +2,7 @@
 class AuthController {
   constructor() {
     this.flutterStarted = false;
+    console.log('AuthController constructor called');
   }
 
   async init() {
@@ -30,14 +31,14 @@ class AuthController {
     console.log('Current Firebase auth state:', isAuthenticated);
 
     if (isAuthenticated) {
-      console.log('User is currently authenticated with Firebase');
-      // Still show auth UI - user can proceed or re-auth
-      console.log('Auth UI should be visible (already authenticated)');
+      console.log('User is currently authenticated with Firebase - starting Flutter');
+      this.startFlutterApp();
       return;
     }
 
-    // User is not authenticated - auth UI should already be showing
-    console.log('User not authenticated - auth UI is showing for initial login');
+    // User is not authenticated - show auth UI
+    console.log('User not authenticated - showing auth UI');
+    window.authUI.showLoginTypeSelection();
   }
 
   waitForServices() {
@@ -145,8 +146,20 @@ class AuthController {
 
 // Initialize auth controller when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded fired - creating and initializing auth controller');
   window.authController = new AuthController();
+  window.authController.init();
 });
+
+// Also try immediate initialization in case DOMContentLoaded already fired
+if (document.readyState === 'loading') {
+  // Document still loading, wait for DOMContentLoaded
+} else {
+  // Document already loaded, initialize immediately
+  console.log('Document already loaded - creating and initializing auth controller immediately');
+  window.authController = new AuthController();
+  window.authController.init();
+}
 
 // Export for use in other scripts
 window.AuthController = AuthController;
