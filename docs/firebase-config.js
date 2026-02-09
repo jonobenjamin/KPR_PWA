@@ -17,7 +17,8 @@ import {
   signInWithPhoneNumber,
   RecaptchaVerifier,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendSignInLinkToEmail
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import {
   getFirestore,
@@ -45,6 +46,7 @@ window.firebaseAuth = {
   RecaptchaVerifier,
   signOut,
   onAuthStateChanged,
+  sendSignInLinkToEmail,
   doc,
   setDoc,
   getDoc,
