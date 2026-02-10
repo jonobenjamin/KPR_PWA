@@ -8,6 +8,7 @@ class AuthController {
   async init() {
     console.log('Auth controller initializing...');
 
+    
     // Wait for auth services to be ready
     await this.waitForServices();
     console.log('Auth services ready');
