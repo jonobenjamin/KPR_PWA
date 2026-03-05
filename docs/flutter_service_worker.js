@@ -3,26 +3,32 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"flutter_bootstrap.js": "44cb4e7183c4eaad49d5e94f6094cf16",
+const RESOURCES = {"flutter_bootstrap.js": "fea3132adc3c2f4e1c8fa497f1cb25c0",
 "version.json": "b359803206879e1d7961102c7506ac90",
-"index.html": "8acdc543ba40df467d610b1e41f9f841",
-"/": "8acdc543ba40df467d610b1e41f9f841",
-"main.dart.js": "92d71c9e59966fb288fae0854b236796",
+"index.html": "cbb956f6720a915b5fedf77b41245137",
+"/": "cbb956f6720a915b5fedf77b41245137",
+"main.dart.js": "c1cb02c0a11db1d60a3ea2fae5273896",
 "flutter.js": "24bc71911b75b5f8135c949e27a2984e",
 "favicon.png": "5dcef449791fa27946b3d35ad8803796",
+"icons/Icon-192.png": "0658615ef1bdea8a662d5bb1c68d97b6",
+"icons/Icon-maskable-192.png": "0658615ef1bdea8a662d5bb1c68d97b6",
+"icons/Icon-maskable-512.png": "f47886b0a99aeb0b6fc9ee305d3b4975",
 "icons/KPR_icon.png": "893ac2e2763c1ad90322d3bf662fc931",
-"manifest.json": "76580970dbeb2cd1a24a8864ccfc022d",
-"assets/NOTICES": "01cacc0b663cd2a8845c7563266b5856",
+"icons/Icon-512.png": "f47886b0a99aeb0b6fc9ee305d3b4975",
+"manifest.json": "e7e1d6ba00518b730832bc6b0ebdb37f",
+"assets/NOTICES": "32dfc05bfd9a30ced5c2a216016680f8",
 "assets/FontManifest.json": "dc3d03800ccca4601324923c0b1d6d57",
-"assets/AssetManifest.bin.json": "2db39c905ef1a182a056a8cc7e4c0019",
+"assets/AssetManifest.bin.json": "71fc47bbeaf91734750ced29c88a75ce",
 "assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "33b7d9392238c04c131b6ce224e13711",
 "assets/packages/flutter_map/lib/assets/flutter_map_logo.png": "208d63cc917af9713fc9572bd5c09362",
 "assets/shaders/ink_sparkle.frag": "ecc85a2e95f5e9f53123dcaf8cb9b6ce",
 "assets/shaders/stretch_effect.frag": "40d68efbbf360632f614c731219e95f0",
-"assets/AssetManifest.bin": "e7da7b9f784ed01c7c0bc7aac1268f51",
-"assets/fonts/MaterialIcons-Regular.otf": "461cf8e6627eb64c73312e6460ec2e6f",
+"assets/AssetManifest.bin": "844fbe2b23846f463f64a5ab02a74a1d",
+"assets/fonts/MaterialIcons-Regular.otf": "3c1590880da32f2751da98cce88785a9",
 "assets/assets/Consession_boundary.geojson": "7f04e0566b20c6e8e96feca2a9a4031e",
 "assets/assets/images/KPR_logo.png": "f70391debeb086a102e3f8fe1a447937",
+"assets/assets/Camps.geojson": "ab9813ab5ca1bf58bb571440ec5edc06",
+"assets/assets/KPR.svg": "36a2ad74d4133532d672f08066458352",
 "assets/assets/KPR_roads.geojson": "15db746ca6531e390dc09b7401888720",
 "canvaskit/skwasm.js": "8060d46e9a4901ca9991edd3a26be4f0",
 "canvaskit/skwasm_heavy.js": "740d43a6b8240ef9e23eed8c48840da4",
@@ -83,7 +89,8 @@ self.addEventListener("activate", function(event) {
       var origin = self.location.origin;
       for (var request of await contentCache.keys()) {
         var key = request.url.substring(origin.length + 1);
-        if (key == "") {
+        if (key.startsWith('KPR_PWA_TEST/')) key = key.substring(13);
+      if (key == "") {
           key = "/";
         }
         // If a resource from the old manifest is not in the new cache, or if
@@ -120,8 +127,32 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== 'GET') {
     return;
   }
+
+  // Cache OSM tiles for offline use (cache when online, serve from cache when offline)
+  if (event.request.url.startsWith('https://tile.openstreetmap.org/')) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        if (response && response.ok) {
+          var clone = response.clone();
+          caches.open('osm-tiles').then(function(cache) { cache.put(event.request, clone); });
+        }
+        return response;
+      }).catch(function() {
+        return caches.open('osm-tiles').then(function(cache) {
+          return cache.match(event.request);
+        });
+      })
+    );
+    return;
+  }
+
   var origin = self.location.origin;
   var key = event.request.url.substring(origin.length + 1);
+  const BASE_PATH = 'KPR_PWA_TEST';
+  // Normalize key for base path deployment (Flutter RESOURCES use paths without base)
+  if (key.startsWith(BASE_PATH + '/')) {
+    key = key.substring(BASE_PATH.length + 1);
+  }
   // Redirect URLs to the index.html
   if (key.indexOf('?v=') != -1) {
     key = key.split('?v=')[0];
@@ -169,10 +200,13 @@ self.addEventListener('message', (event) => {
 // and populate them.
 async function downloadOffline() {
   var resources = [];
+  var origin = self.location.origin;
+  var basePath = 'KPR_PWA_TEST';
   var contentCache = await caches.open(CACHE_NAME);
   var currentContent = {};
   for (var request of await contentCache.keys()) {
     var key = request.url.substring(origin.length + 1);
+    if (key.startsWith(basePath + '/')) key = key.substring(basePath.length + 1);
     if (key == "") {
       key = "/";
     }

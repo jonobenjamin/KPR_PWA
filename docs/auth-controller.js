@@ -57,29 +57,52 @@ class AuthController {
     console.log('Auth screen should already be visible');
   }
 
-  showReturningUserMessage(userName) {
-    const container = document.createElement('div');
-    container.id = 'auth-overlay';
-    container.innerHTML = `
-      <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: flex; justify-content: center; align-items: center; z-index: 9999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <div style="background: white; border-radius: 16px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); text-align: center;">
-          <h2 style="margin: 0 0 20px 0; color: #333; font-size: 24px;">Welcome back, ${userName}!</h2>
-          <div style="font-size: 48px; margin-bottom: 20px;">👋</div>
-          <p style="color: #666; margin-bottom: 20px; font-size: 16px;">
-            Loading your KPR Monitoring workspace...
-          </p>
-          <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007aff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-          <style>
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          </style>
-        </div>
-      </div>
-    `;
+  startFlutterApp() {
+    console.log('🎯 STARTING FLUTTER APP - User is authenticated');
 
-    document.body.appendChild(container);
+    // Prevent multiple calls
+    if (this.flutterStarted) {
+      console.log('Flutter app already started, skipping');
+      return;
+    }
+    this.flutterStarted = true;
+
+    // Hide auth overlay if it exists
+    const overlay = document.getElementById('auth-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      console.log('Auth overlay hidden');
+    }
+
+    // Start Flutter app - bootstrap script should already be loaded
+    console.log('Starting Flutter app - calling loader...');
+    if (window._flutter && window._flutter.loader) {
+      const loadPromise = window._flutter.loader.load({
+        serviceWorkerSettings: {
+          serviceWorkerVersion: "1699259309"
+        }
+      });
+      if (loadPromise && typeof loadPromise.then === 'function') {
+        loadPromise.then(() => this.triggerOfflinePrefetch()).catch(() => {});
+      } else {
+        // Fallback: trigger prefetch after a short delay (loader may not return promise)
+        setTimeout(() => this.triggerOfflinePrefetch(), 3000);
+      }
+      console.log('Flutter loader called successfully');
+    } else {
+      console.error('Flutter loader not available');
+    }
+  }
+
+  /** Prefetch all app resources + OSM tiles when online so app works in airplane mode */
+  triggerOfflinePrefetch() {
+    if (!navigator.onLine || !navigator.serviceWorker) return;
+    navigator.serviceWorker.ready.then(reg => {
+      if (reg.active) {
+        reg.active.postMessage('downloadOffline');
+        console.log('Triggered offline prefetch for airplane mode');
+      }
+    }).catch(() => {});
   }
 
   showOfflineMessage() {
@@ -105,41 +128,6 @@ class AuthController {
 
     document.body.appendChild(container);
   }
-
-
-  startFlutterApp() {
-    console.log('🎯 STARTING FLUTTER APP - User is authenticated');
-
-    // Prevent multiple calls
-    if (this.flutterStarted) {
-      console.log('Flutter app already started, skipping');
-      return;
-    }
-    this.flutterStarted = true;
-
-    // Hide auth overlay if it exists
-    const overlay = document.getElementById('auth-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-      console.log('Auth overlay hidden');
-    }
-
-    // Start Flutter app - bootstrap script should already be loaded
-    console.log('Starting Flutter app - calling loader...');
-    if (window._flutter && window._flutter.loader) {
-      window._flutter.loader.load({
-        serviceWorkerSettings: {
-          serviceWorkerVersion: "3967701479"
-        }
-      });
-      console.log('Flutter loader called successfully');
-    } else {
-      console.error('Flutter loader not available');
-    }
-  }
-
-
-
 }
 
 // Initialize auth controller when DOM is ready
@@ -158,6 +146,3 @@ if (document.readyState === 'loading') {
   window.authController = new AuthController();
   window.authController.init();
 }
-
-// Export for use in other scripts
-window.AuthController = AuthController;
