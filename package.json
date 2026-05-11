@@ -1,0 +1,9 @@
+{
+  "name": "kpr-pwa-repo-root",
+  "private": true,
+  "description": "Vercel builds from repo root; the API is in backend api/backend (see root vercel.json).",
+  "scripts": {
+    "build": "echo \"Root build noop — Vercel bundles backend api/backend/server.js\"",
+    "vercel-build": "echo \"Root vercel-build noop\""
+  }
+}

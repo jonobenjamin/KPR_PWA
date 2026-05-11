@@ -1,0 +1,49 @@
+{
+  "version": 2,
+  "installCommand": "cd \"backend api/backend\" && npm install",
+  "builds": [
+    {
+      "src": "backend api/backend/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "backend api/backend/server.js"
+    }
+  ],
+  "functions": {
+    "backend api/backend/server.js": {
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS, POST, PUT, PATCH, DELETE"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key"
+        }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/fire-check",
+      "schedule": "0 4 * * *"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
