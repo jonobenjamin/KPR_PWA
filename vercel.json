@@ -3,18 +3,18 @@
   "installCommand": "cd \"backend api/backend\" && npm install",
   "builds": [
     {
-      "src": "backend api/backend/server.js",
+      "src": "api/index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "backend api/backend/server.js"
+      "dest": "/api/index.js"
     }
   ],
   "functions": {
-    "backend api/backend/server.js": {
+    "api/index.js": {
       "maxDuration": 60
     }
   },
@@ -36,14 +36,5 @@
         }
       ]
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/fire-check",
-      "schedule": "0 4 * * *"
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
