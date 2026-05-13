@@ -89,5 +89,9 @@ module.exports = (req, res) => {
 
   applyCors(res);
   if (handlePreflight(req, res)) return;
-  res.status(404).json({ error: 'Route not found' });
+  // Temporary debug info — remove after diagnosis
+  res.status(404).json({
+    error: 'Route not found',
+    _debug: { path, url: req.url, method: req.method, xMatchedPath: req.headers['x-matched-path'] || null }
+  });
 };
