@@ -66,8 +66,10 @@ function runExpressMount(mountPath, router, req, res) {
   applyCors(res);
   if (handlePreflight(req, res)) return;
 
+  const urlBefore = req.url;
   if (!adjustUrl(req, mountPath)) {
-    res.status(404).json({ error: 'Route not found' });
+    // _debug: adjustUrl returned false — path didn't match mount
+    res.status(404).json({ error: 'Route not found', _debug: { reason: 'adjustUrl-false', urlBefore, xMatchedPath: req.headers['x-matched-path'] || null, mountPath } });
     return;
   }
 
@@ -87,11 +89,12 @@ function runExpressMount(mountPath, router, req, res) {
       router(req, res, (e) => {
         if (e) {
           console.error(e);
-          if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+          if (!res.headersSent) res.status(500).json({ error: 'Internal server error', _debug: { message: e.message } });
           return;
         }
         if (!res.writableEnded && !res.headersSent) {
-          res.status(404).json({ error: 'Route not found' });
+          // _debug: router called next() — no route matched inside the sub-router
+          res.status(404).json({ error: 'Route not found', _debug: { reason: 'router-next', urlAfterAdjust: req.url, method: req.method, mountPath } });
         }
       });
     });
