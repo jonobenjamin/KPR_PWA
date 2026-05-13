@@ -8,6 +8,49 @@ const router = express.Router();
 
 const { getUserDocByIdentifier } = require('../lib/resolveFirestoreUser');
 
+/** Admin SDK returns Firestore Timestamps; client/API rows may use ISO strings. */
+function observationTimestampToMillis(ts) {
+  if (ts == null) return NaN;
+  if (typeof ts === 'string' || typeof ts === 'number') {
+    const d = new Date(ts);
+    return d.getTime();
+  }
+  if (typeof ts.toDate === 'function') {
+    return ts.toDate().getTime();
+  }
+  if (ts.seconds != null) {
+    return ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1e6);
+  }
+  if (ts._seconds != null) {
+    return ts._seconds * 1000 + Math.floor((ts._nanoseconds || 0) / 1e6);
+  }
+  return NaN;
+}
+
+/** PWA map markers need lat/lon; some rows only store a GeoPoint in `location` or use lat/lng aliases. */
+function extractObservationLatLng(data) {
+  let lat = data.latitude;
+  let lon = data.longitude;
+  if ((lat == null || lat === '') && data.lat != null) lat = data.lat;
+  if ((lon == null || lon === '') && data.lng != null) lon = data.lng;
+  if ((lon == null || lon === '') && data.lon != null) lon = data.lon;
+  const loc = data.location;
+  if ((lat == null || lon == null) && loc != null && typeof loc === 'object') {
+    if (typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
+      lat = loc.latitude;
+      lon = loc.longitude;
+    } else if (typeof loc._latitude === 'number' && typeof loc._longitude === 'number') {
+      lat = loc._latitude;
+      lon = loc._longitude;
+    }
+  }
+  const nlat = lat == null || lat === '' ? NaN : Number(lat);
+  const nlon = lon == null || lon === '' ? NaN : Number(lon);
+  if (Number.isNaN(nlat) || Number.isNaN(nlon)) return null;
+  if (nlat < -90 || nlat > 90 || nlon < -180 || nlon > 180) return null;
+  return { latitude: nlat, longitude: nlon };
+}
+
 // Check if user is revoked
 async function checkUserRevoked(db, userIdentifier) {
   try {
@@ -104,45 +147,33 @@ async function optionalBearerUser(req, res, next) {
   next();
 }
 
-// === Unauthenticated (Firebase ID token only) ===
-router.get('/mine', verifyBearerUser, async (req, res) => {
-  try {
-    if (!db) {
-      return res.status(503).json({ success: false, error: 'Database not available' });
-    }
-    const uid = req.firebaseUser.uid;
-    // Single-field equality only — no composite index required; sort in process below.
-    const snapshot = await db.collection('observations').where('user_uid', '==', uid).get();
-
-    const rows = [];
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const row = { id: doc.id, ...data };
-      delete row.poaching_image;
-      rows.push(row);
-    });
-
-    rows.sort((a, b) => {
-      const ta = new Date(a.timestamp || 0).getTime();
-      const tb = new Date(b.timestamp || 0).getTime();
-      return tb - ta;
-    });
-
-    res.json({
-      success: true,
-      data: rows,
-      count: rows.length
-    });
-  } catch (error) {
-    console.error('GET /mine error:', error);
-    res.status(500).json({ success: false, error: 'Failed to load your sightings' });
+/** Moremi PWA map feed: API key, or Firebase ID token (web builds often omit dart-define API_KEY). */
+async function validateApiKeyOrFirebaseBearer(req, res, next) {
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  if (apiKey && apiKey === process.env.API_KEY) {
+    return next();
   }
-});
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Valid API key or Authorization: Bearer <Firebase ID token> required'
+    });
+  }
+  try {
+    await admin.auth().verifyIdToken(token);
+    return next();
+  } catch (e) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or expired ID token'
+    });
+  }
+}
 
-router.use(validateApiKey);
-
-// GET /api/observations/recent — wildlife sightings only (optionally since ISO date for bandwidth)
-router.get('/recent', async (req, res) => {
+// GET /api/observations/recent — map feed (before API-key-only middleware)
+router.get('/recent', validateApiKeyOrFirebaseBearer, async (req, res) => {
   try {
     if (!db) {
       return res.status(503).json({
@@ -163,12 +194,14 @@ router.get('/recent', async (req, res) => {
     snapshot.forEach(doc => {
       const data = doc.data();
       if (data.category !== 'Sighting') return;
-      const observation = { id: doc.id, ...data };
+      const coords = extractObservationLatLng(data);
+      if (!coords) return;
+      const observation = { id: doc.id, ...data, latitude: coords.latitude, longitude: coords.longitude };
       delete observation.poaching_image;
-      if (observation.latitude === undefined || observation.longitude === undefined) return;
       if (sinceDate) {
-        const t = new Date(observation.timestamp || 0);
-        if (Number.isNaN(t.getTime()) || t < sinceDate) return;
+        const t = observationTimestampToMillis(observation.timestamp);
+        // If timestamp is missing or not parseable, still include (map was returning 0 for valid rows).
+        if (!Number.isNaN(t) && t < sinceDate.getTime()) return;
       }
       observations.push(observation);
     });
@@ -183,6 +216,45 @@ router.get('/recent', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch recent sightings' });
   }
 });
+
+// === Unauthenticated (Firebase ID token only) ===
+router.get('/mine', verifyBearerUser, async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ success: false, error: 'Database not available' });
+    }
+    const uid = req.firebaseUser.uid;
+    // Single-field equality only — no composite index required; sort in process below.
+    const snapshot = await db.collection('observations').where('user_uid', '==', uid).get();
+
+    const rows = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const row = { id: doc.id, ...data };
+      delete row.poaching_image;
+      rows.push(row);
+    });
+
+    rows.sort((a, b) => {
+      const ta = observationTimestampToMillis(a.timestamp);
+      const tb = observationTimestampToMillis(b.timestamp);
+      return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
+    });
+
+    res.json({
+      success: true,
+      data: rows,
+      count: rows.length
+    });
+  } catch (error) {
+    console.error('GET /mine error:', error);
+    res.status(500).json({ success: false, error: 'Failed to load your sightings' });
+  }
+});
+
+router.use(validateApiKey);
+
+// GET /api/observations/recent is registered above (API key or Firebase Bearer) for Moremi web.
 
 // GET /api/observations - Fetch observations for map display (READ-ONLY with location data only)
 router.get('/', async (req, res) => {

@@ -1,6 +1,10 @@
 'use strict';
 
-const rt = require('../backend api/backend/api/_lib/runtime');
+// Vercel may run an Express-framework detector that only looks for a direct `require('express')`
+// on an entry file. This handler is serverless; express is still used inside `./_lib/runtime`.
+require('express');
+
+const rt = require('./_lib/runtime');
 
 const {
   applyCors,
