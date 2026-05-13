@@ -35,6 +35,18 @@ function routePath(req) {
 module.exports = (req, res) => {
   const path = routePath(req);
 
+  // Temporary debug route — remove after diagnosis
+  if (path === '/api/debug-routing' || path.startsWith('/api/debug-routing')) {
+    applyCors(res);
+    return res.status(200).json({
+      url: req.url,
+      path,
+      method: req.method,
+      xMatchedPath: req.headers['x-matched-path'] || null,
+      xVercelId: req.headers['x-vercel-id'] || null,
+    });
+  }
+
   if (path === '/api' || path === '/api/') {
     return sendApiIndex(req, res);
   }
