@@ -3,34 +3,36 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"flutter_bootstrap.js": "513e3c64c9b0691649336270db7c7b87",
+const RESOURCES = {"flutter_bootstrap.js": "46cd60b84788e5732b6547e5f2813282",
 "version.json": "b359803206879e1d7961102c7506ac90",
-"index.html": "cbb956f6720a915b5fedf77b41245137",
-"/": "cbb956f6720a915b5fedf77b41245137",
-"main.dart.js": "5b5909bf589c14b8318d06150f882990",
+"index.html": "8523400e3a3889702a21f80226a8ac7b",
+"/": "8523400e3a3889702a21f80226a8ac7b",
+"main.dart.js": "6a66ca9816656350dab31fd9b9e53b9e",
 "flutter.js": "24bc71911b75b5f8135c949e27a2984e",
 "favicon.png": "5dcef449791fa27946b3d35ad8803796",
 "icons/Icon-192.png": "0658615ef1bdea8a662d5bb1c68d97b6",
 "icons/Icon-maskable-192.png": "0658615ef1bdea8a662d5bb1c68d97b6",
+"icons/Logo_icon.png": "319134ea387aa3f5cbf0f4599dc40eab",
 "icons/Icon-maskable-512.png": "f47886b0a99aeb0b6fc9ee305d3b4975",
 "icons/KPR_icon.png": "893ac2e2763c1ad90322d3bf662fc931",
 "icons/Icon-512.png": "f47886b0a99aeb0b6fc9ee305d3b4975",
-"manifest.json": "e7e1d6ba00518b730832bc6b0ebdb37f",
-"assets/NOTICES": "32dfc05bfd9a30ced5c2a216016680f8",
+"manifest.json": "5c5b07b7c9b1cb74210f81ac30130da7",
+"assets/NOTICES": "0db2229f6edb34188fc05945620ac405",
+"assets/KPR.svg": "36a2ad74d4133532d672f08066458352",
 "assets/FontManifest.json": "dc3d03800ccca4601324923c0b1d6d57",
-"assets/AssetManifest.bin.json": "35b2bae5b46a517322b12ed524455555",
-"assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "33b7d9392238c04c131b6ce224e13711",
+"assets/AssetManifest.bin.json": "9ad569bcdfeeee6c40174bc9742f1948",
+"assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "b93248a553f9e8bc17f1065929d5934b",
 "assets/packages/flutter_map/lib/assets/flutter_map_logo.png": "208d63cc917af9713fc9572bd5c09362",
 "assets/shaders/ink_sparkle.frag": "ecc85a2e95f5e9f53123dcaf8cb9b6ce",
 "assets/shaders/stretch_effect.frag": "40d68efbbf360632f614c731219e95f0",
-"assets/AssetManifest.bin": "fed58b285154c96f3caf10a67c7cd72e",
-"assets/fonts/MaterialIcons-Regular.otf": "662463b7e278ac1b2d533c5cc034862d",
-"assets/assets/Consession_boundary.geojson": "7f04e0566b20c6e8e96feca2a9a4031e",
-"assets/assets/images/KPR_logo.png": "f70391debeb086a102e3f8fe1a447937",
-"assets/assets/images/KPR_PWA_Background_image.png": "72e974e963f2e43a63b6b259b330fbae",
-"assets/assets/Camps.geojson": "ab9813ab5ca1bf58bb571440ec5edc06",
-"assets/assets/KPR.svg": "36a2ad74d4133532d672f08066458352",
-"assets/assets/KPR_roads.geojson": "15db746ca6531e390dc09b7401888720",
+"assets/AssetManifest.bin": "4e18dc29a70f463e09bd341d05220fbe",
+"assets/fonts/MaterialIcons-Regular.otf": "e7069dfd19b331be16bed984668fe080",
+"assets/assets/camp.svg": "41c88676ab517d43f611890327b0fd5c",
+"assets/assets/lodge.svg": "f6ee6ce79b0b21805dcd95ffed24677f",
+"assets/assets/gate.svg": "3984de2c6d9dc77a8bcc03281dc906c2",
+"assets/assets/Camps.geojson": "c94d53128caaceb8ee80cc9b99c27e0b",
+"assets/assets/Moremi_roads.geojson": "dc097ba77813390cee7aa02cd5187441",
+"assets/assets/Moremi_boundary.geojson": "305cf978681b9325e08175952572a75b",
 "canvaskit/skwasm.js": "8060d46e9a4901ca9991edd3a26be4f0",
 "canvaskit/skwasm_heavy.js": "740d43a6b8240ef9e23eed8c48840da4",
 "canvaskit/skwasm.js.symbols": "3a4aadf4e8141f284bd524976b1d6bdc",
@@ -51,13 +53,31 @@ const CORE = ["main.dart.js",
 "assets/AssetManifest.bin.json",
 "assets/FontManifest.json"];
 
+const MOREMI_SW_BASE = 'Moremi-PWA';
+function moremiPublicUrl(resourceKey) {
+  var k = resourceKey === '/' || resourceKey === '' ? '' : String(resourceKey).replace(/^\//, '');
+  return self.location.origin + '/' + MOREMI_SW_BASE + '/' + k;
+}
+
+
 // During install, the TEMP cache is populated with the application shell files.
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   return event.waitUntil(
-    caches.open(TEMP).then((cache) => {
-      return cache.addAll(
-        CORE.map((value) => new Request(value, {'cache': 'reload'})));
+    caches.open(TEMP).then(function (cache) {
+      return Promise.allSettled(
+        CORE.map(function (value) {
+          var url = moremiPublicUrl(value);
+          var req = new Request(url, { cache: 'reload' });
+          return fetch(req)
+            .then(function (res) {
+              if (res && res.ok) return cache.put(req, res);
+            })
+            .catch(function (e) {
+              console.warn('[flutter_service_worker] install skip:', url, e);
+            });
+        })
+      );
     })
   );
 });
@@ -90,7 +110,7 @@ self.addEventListener("activate", function(event) {
       var origin = self.location.origin;
       for (var request of await contentCache.keys()) {
         var key = request.url.substring(origin.length + 1);
-        if (key.startsWith('KPR_PWA_TEST/')) key = key.substring(13);
+        if (key.startsWith('Moremi-PWA/')) key = key.substring(11);
       if (key == "") {
           key = "/";
         }
@@ -129,7 +149,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache OSM tiles for offline use (cache when online, serve from cache when offline)
   if (event.request.url.startsWith('https://tile.openstreetmap.org/')) {
     event.respondWith(
       fetch(event.request).then(function(response) {
@@ -149,11 +168,6 @@ self.addEventListener("fetch", (event) => {
 
   var origin = self.location.origin;
   var key = event.request.url.substring(origin.length + 1);
-  const BASE_PATH = 'KPR_PWA_TEST';
-  // Normalize key for base path deployment (Flutter RESOURCES use paths without base)
-  if (key.startsWith(BASE_PATH + '/')) {
-    key = key.substring(BASE_PATH.length + 1);
-  }
   // Redirect URLs to the index.html
   if (key.indexOf('?v=') != -1) {
     key = key.split('?v=')[0];
@@ -201,13 +215,10 @@ self.addEventListener('message', (event) => {
 // and populate them.
 async function downloadOffline() {
   var resources = [];
-  var origin = self.location.origin;
-  var basePath = 'KPR_PWA_TEST';
   var contentCache = await caches.open(CACHE_NAME);
   var currentContent = {};
   for (var request of await contentCache.keys()) {
     var key = request.url.substring(origin.length + 1);
-    if (key.startsWith(basePath + '/')) key = key.substring(basePath.length + 1);
     if (key == "") {
       key = "/";
     }
@@ -218,7 +229,19 @@ async function downloadOffline() {
       resources.push(resourceKey);
     }
   }
-  return contentCache.addAll(resources);
+  return Promise.allSettled(
+    resources.map(function (resourceKey) {
+      var abs = moremiPublicUrl(resourceKey);
+      var reqPut = new Request(abs);
+      return fetch(abs, { cache: 'reload' })
+        .then(function (res) {
+          if (res && res.ok) return contentCache.put(reqPut, res.clone());
+        })
+        .catch(function (e) {
+          console.warn('[flutter_service_worker] offline prefetch skip:', abs, e);
+        });
+    })
+  );
 }
 // Attempt to download the resource online before falling back to
 // the offline cache.
@@ -241,3 +264,9 @@ function onlineFirst(event) {
     })
   );
 }
+
+
+// Moremi: take control of open tabs as soon as this worker activates
+self.addEventListener('activate', function (event) {
+  event.waitUntil(self.clients.claim());
+});
