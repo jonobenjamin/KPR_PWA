@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Express application for local development only (`node server.js`).
- * Production traffic uses /api/*.js serverless handlers at the repo root.
+ * Express application for local development (`node server.js`) and Vercel
+ * (via repo-root `api/index.js` → `../backend api/backend/server.js`).
  */
 
 require('dotenv').config();
@@ -19,6 +19,36 @@ const MOREMI_CORS_ALLOW_HEADERS =
   'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key';
 
 const { completeClientFirebasePayload } = require('./lib/clientFirebasePayload');
+
+/** All-requests stub when a route module fails to load (missing file, bad path on Vercel, etc.). */
+function stubRouter(message) {
+  const r = express.Router();
+  r.all('*', (req, res) => {
+    res.status(503).json({ error: 'Service unavailable', message });
+  });
+  return r;
+}
+
+function useDbRouter(app, mountPath, relPath, label) {
+  try {
+    const factory = require(relPath);
+    app.use(mountPath, factory(db));
+    console.log(`[Moremi routes] mounted ${label} at ${mountPath}`);
+  } catch (err) {
+    console.error(`[Moremi routes] FAILED ${label} (require ${relPath})`, err);
+    app.use(mountPath, stubRouter(`${label} routes failed to load`));
+  }
+}
+
+function useStaticRouter(app, mountPath, relPath, label) {
+  try {
+    app.use(mountPath, require(relPath));
+    console.log(`[Moremi routes] mounted ${label} at ${mountPath}`);
+  } catch (err) {
+    console.error(`[Moremi routes] FAILED ${label} (require ${relPath})`, err);
+    app.use(mountPath, stubRouter(`${label} routes failed to load`));
+  }
+}
 
 function createApp() {
   const app = express();
@@ -98,27 +128,31 @@ function createApp() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
 
-  app.get('/', (req, res) => {
-    res.json({
-      message: 'Wildlife Tracker API (local Express)',
-      version: '1.0.0',
-      note: 'Production uses one Vercel function at /api (see repo root vercel.json).',
-      endpoints: {
-        health: '/health',
-        clientFirebase: '/api/client-firebase-config'
-      }
-    });
-  });
-
-  app.get('/health', (req, res) => {
-    res.json({
+  function sendHealth(_req, res) {
+    res.status(200).json({
       status: 'OK',
       timestamp: new Date().toISOString(),
       firebase_project_id: fb.firebaseAdminProjectId || fb.parseServiceAccountProjectId(),
       firestore_database_id: fb.firestoreDatabaseIdForHealth,
       db_ready: !!db
     });
+  }
+
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'Moremi API (local Express)',
+      version: '1.0.0',
+      note: 'Production uses one Vercel function at /api (see repo root vercel.json).',
+      endpoints: {
+        health: '/health',
+        healthApi: '/api/health',
+        clientFirebase: '/api/client-firebase-config'
+      }
+    });
   });
+
+  app.get('/health', sendHealth);
+  app.get('/api/health', sendHealth);
 
   const testUpload = require('multer')({
     storage: require('multer').memoryStorage(),
@@ -140,15 +174,32 @@ function createApp() {
     });
   });
 
-  app.use('/api/observations', require('./routes/observations')(db));
-  app.use('/api/map', require('./routes/map'));
+  useDbRouter(app, '/api/observations', './routes/observations', 'observations');
+  useStaticRouter(app, '/api/map', './routes/map', 'map');
 
-  const authRouter = require('./routes/auth')(db);
+  let authRouter;
+  try {
+    authRouter = require('./routes/auth')(db);
+    console.log('[Moremi routes] mounted auth router');
+  } catch (err) {
+    console.error('[Moremi routes] FAILED auth (require ./routes/auth)', err);
+    authRouter = stubRouter('auth routes failed to load');
+  }
+
   function mountAuthWithJoin(prefix) {
     const r = express.Router();
     if (db) {
-      r.post('/join-group', require('./routes/moremi-group-join')(db));
-      r.post('/create-group', require('./routes/moremi-group-create')(db));
+      try {
+        r.post('/join-group', require('./routes/moremi-group-join')(db));
+        r.post('/create-group', require('./routes/moremi-group-create')(db));
+        console.log('[Moremi routes] loaded moremi-group-join + moremi-group-create for', prefix);
+      } catch (err) {
+        console.error('[Moremi routes] FAILED moremi-group-join or moremi-group-create', err);
+        const fail = (_req, res) =>
+          res.status(503).json({ success: false, message: 'Group join/create unavailable' });
+        r.post('/join-group', fail);
+        r.post('/create-group', fail);
+      }
     } else {
       r.post('/join-group', (req, res) => {
         res.status(503).json({ success: false, message: 'Database not configured' });
@@ -163,9 +214,9 @@ function createApp() {
   mountAuthWithJoin('/api/moremi-auth');
   mountAuthWithJoin('/api/auth');
 
-  app.use('/api/moremi-app', require('./routes/moremi-app')(db));
-  app.use('/api/water-monitoring', require('./routes/water-monitoring')(db));
-  app.use('/api/tracking', require('./routes/tracking')(db));
+  useDbRouter(app, '/api/moremi-app', './routes/moremi-app', 'moremi-app');
+  useDbRouter(app, '/api/water-monitoring', './routes/water-monitoring', 'water-monitoring');
+  useDbRouter(app, '/api/tracking', './routes/tracking', 'tracking');
 
   app.use((err, req, res, _next) => {
     console.error(err.stack);

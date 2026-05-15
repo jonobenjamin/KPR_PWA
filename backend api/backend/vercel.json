@@ -1,22 +1,51 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [{"src": "server.js", "use": "@vercel/node"}],
-  "routes": [{"src": "/(.*)", "dest": "server.js"}],
+  "framework": null,
+  "installCommand": "npm install",
+  "rewrites": [
+    { "source": "/health", "destination": "/api" },
+    { "source": "/api/health", "destination": "/api" },
+    { "source": "/api/client-firebase-config", "destination": "/api" },
+    { "source": "/api/observations/:path*", "destination": "/api" },
+    { "source": "/api/map/:path*", "destination": "/api" },
+    { "source": "/api/moremi-auth/:path*", "destination": "/api" },
+    { "source": "/api/auth/:path*", "destination": "/api" },
+    { "source": "/api/moremi-app/:path*", "destination": "/api" },
+    { "source": "/api/water-monitoring/:path*", "destination": "/api" },
+    { "source": "/api/tracking/:path*", "destination": "/api" }
+  ],
   "functions": {
-    "server.js": {
-      "maxDuration": 60
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": [
+        "routes/**",
+        "lib/**",
+        "services/**",
+        "data/**"
+      ]
     }
   },
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        {"key": "Access-Control-Allow-Origin", "value": "*"},
-        {"key": "Access-Control-Allow-Methods", "value": "GET, OPTIONS, POST, PUT, PATCH, DELETE"},
-        {"key": "Access-Control-Allow-Headers", "value": "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key"}
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS, POST, PUT, PATCH, DELETE"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key"
+        }
       ]
     }
   ],
-  "crons": [{"path": "/api/cron/fire-check", "schedule": "0 4 * * *"}],
-  "env": {"NODE_ENV": "production"}
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

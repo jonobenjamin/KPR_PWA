@@ -1,21 +1,28 @@
 {
   "version": 2,
+  "framework": null,
   "installCommand": "cd \"backend api/backend\" && npm install",
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.js"
-    }
+  "rewrites": [
+    { "source": "/health", "destination": "/api" },
+    { "source": "/api/health", "destination": "/api" },
+    { "source": "/api/client-firebase-config", "destination": "/api" },
+    { "source": "/api/observations/:path*", "destination": "/api" },
+    { "source": "/api/map/:path*", "destination": "/api" },
+    { "source": "/api/moremi-auth/:path*", "destination": "/api" },
+    { "source": "/api/auth/:path*", "destination": "/api" },
+    { "source": "/api/moremi-app/:path*", "destination": "/api" },
+    { "source": "/api/water-monitoring/:path*", "destination": "/api" },
+    { "source": "/api/tracking/:path*", "destination": "/api" }
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": [
+        "backend api/backend/routes/**",
+        "backend api/backend/lib/**",
+        "backend api/backend/services/**",
+        "backend api/backend/data/**"
+      ]
     }
   },
   "headers": [
