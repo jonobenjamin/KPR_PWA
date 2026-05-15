@@ -64,7 +64,14 @@ module.exports = function moremiCreateGroupHandler(db) {
         groupId: gid,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      batch.set(profileRef, { currentGroupId: gid }, { merge: true });
+      batch.set(
+        profileRef,
+        {
+          currentGroupId: gid,
+          groupIds: admin.firestore.FieldValue.arrayUnion(gid),
+        },
+        { merge: true }
+      );
 
       await batch.commit();
 

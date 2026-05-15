@@ -50,7 +50,12 @@ module.exports = function moremiJoinGroupHandler(db) {
         if (memberIds.includes(uid)) {
           t.set(
             profileRef,
-            { currentGroupId: groupId, username, avatarEmoji },
+            {
+              currentGroupId: groupId,
+              username,
+              avatarEmoji,
+              groupIds: admin.firestore.FieldValue.arrayUnion(groupId),
+            },
             { merge: true }
           );
           return;
@@ -68,7 +73,8 @@ module.exports = function moremiJoinGroupHandler(db) {
           {
             username,
             avatarEmoji,
-            currentGroupId: groupId
+            currentGroupId: groupId,
+            groupIds: admin.firestore.FieldValue.arrayUnion(groupId),
           },
           { merge: true }
         );

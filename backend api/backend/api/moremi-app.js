@@ -1,7 +1,8 @@
 const express = require('express');
 
-const joinGroupHandler = require('./moremi-group-join');
-const createGroupHandler = require('./moremi-group-create');
+const joinGroupHandler = require('../routes/moremi-group-join');
+const createGroupHandler = require('../routes/moremi-group-create');
+const syncGroupIdsHandler = require('../routes/moremi-sync-group-ids');
 
 /**
  * Moremi PWA — /api/moremi-app routes (group join/create via server; other data is client Firestore).
@@ -19,6 +20,7 @@ module.exports = function moremiAppRouter(db) {
 
   router.post('/join-group', joinGroupHandler(db));
   router.post('/create-group', createGroupHandler(db));
+  router.post('/sync-group-ids', syncGroupIdsHandler(db));
 
   return router;
 };
