@@ -1,0 +1,2437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khwai Private Reserve Monitoring Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data/icons/KPR.svg">
+    <link rel="icon" type="image/png" href="data/icons/KPR_icon.png">
+    <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/auth-portal.js"></script>
+    <script>
+      (async function() {
+        await window.AuthPortal.checkAuthAndRedirect(false);
+        const page = (window.location.pathname.split('/').pop() || 'map.html');
+        const user = window.firebasePortal?.auth?.currentUser;
+        if (user) {
+          const role = await window.AuthPortal.getUserRole(user.uid);
+          if (role !== 'admin') window.location.replace('map-users.html');
+        }
+      })();
+    </script>
+
+    <!-- Bootstrap 5 (dropdowns for account avatar) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Leaflet TextPath Plugin CSS -->
+    <style>
+        .leaflet-text-path {
+            pointer-events: none;
+        }
+        .show-weather-btn {
+            display: inline-block;
+            margin-top: 6px;
+            color: #1e90ff;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .show-weather-btn:hover { text-decoration: underline; }
+        .show-water-quality-btn {
+            display: inline-block;
+            margin-top: 6px;
+            margin-left: 8px;
+            color: #187bcd;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .show-water-quality-btn:hover { text-decoration: underline; }
+    </style>
+</head>
+<body class="app-layout-corridor">
+    <div class="dropdown user-avatar-float">
+        <button type="button" class="user-avatar-btn" id="userAvatarMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu" aria-haspopup="true">
+            <span id="userAvatarInitials">··</span>
+            <span class="user-status-dot" aria-hidden="true"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userAvatarMenuBtn">
+            <li><a class="dropdown-item" href="profile.html" id="userAvatarProfileLink">Profile</a></li>
+            <li><hr class="dropdown-divider" role="presentation"></li>
+            <li><a class="dropdown-item" href="#" id="userAvatarSignOut">Log out</a></li>
+        </ul>
+    </div>
+
+    <aside class="app-sidebar" aria-label="Site navigation">
+        <div class="app-sidebar-brand">
+            <img src="data/icons/KPR.svg" alt="" class="app-sidebar-logo" width="40" height="40">
+            <span class="app-sidebar-title">KPR<br>Monitoring</span>
+        </div>
+        <nav class="app-sidebar-nav">
+            <a href="map.html" class="app-sidebar-link is-active" aria-current="page">Concession Map</a>
+            <a href="user-submissions.html" class="app-sidebar-link">Admin Panel</a>
+            <a href="vehicle-tracker.html" class="app-sidebar-link">Vehicle Tracker</a>
+            <a href="https://jonobenjamin.github.io/KPR_PWA/" target="_blank" rel="noopener noreferrer" class="app-sidebar-link">Submit Data</a>
+        </nav>
+    </aside>
+
+    <div class="app-main-wrap">
+        <header class="app-page-header">
+            <h1 class="app-page-title"><img src="data/icons/KPR.svg" alt="" class="app-page-logo" width="48" height="48">Khwai Private Reserve Monitoring Dashboard</h1>
+        </header>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Map Section (75% width) -->
+        <div class="map-section">
+            <div id="loading" class="map-loading">
+                <img src="data/icons/pangolin_loading.svg" alt="" class="loading-icon">
+                <span class="loading-text">Loading...</span>
+            </div>
+            <div id="map"></div>
+        </div>
+
+        <!-- Sidebar (40% width) -->
+        <div class="sidebar">
+            <h3>Filters & Controls</h3>
+
+            <!-- View Mode Dropdown - MOVED TO TOP -->
+            <div class="control-group">
+                <h4>View Mode</h4>
+                <select id="view-mode-select" class="view-select">
+                    <option value="sightings" selected>Sightings</option>
+                    <option value="trees">Trees</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="incidents">Incidents</option>
+                    <option value="water-quality">Water Quality</option>
+                    <option value="water-monitoring">Water Monitoring</option>
+                    <option value="fires">Fires</option>
+                    <option value="vehicle-tracker">Vehicle Tracker</option>
+                </select>
+            </div>
+
+            <!-- Date Range Controls -->
+            <div class="control-group">
+                <h4>Date Range</h4>
+                <div class="date-controls date-range-controls">
+                    <div class="date-control">
+                        <label for="start-date">Start Date</label>
+                        <input type="date" id="start-date">
+                    </div>
+                    <div class="date-control">
+                        <label for="end-date">End Date</label>
+                        <input type="date" id="end-date">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Month/Year Selector -->
+            <div class="control-group">
+                <h4>Month & Year</h4>
+                <div class="date-controls">
+                    <div class="date-control">
+                        <label for="month-select">Month</label>
+                        <select id="month-select">
+                            <option value="">All Months</option>
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="date-control">
+                        <label for="year-select">Year</label>
+                        <select id="year-select">
+                            <option value="" selected>All Years</option>
+                            <option value="2020">2020</option>
+                            <option value="2021">2021</option>
+                            <option value="2022">2022</option>
+                            <option value="2023">2023</option>
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                            <option value="2029">2029</option>
+                            <option value="2030">2030</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Species Filter (Sightings only) -->
+            <div class="control-group" id="species-group" style="display: block;">
+                <h4>Species Filter</h4>
+                <div class="species-filter">
+                    <select id="species-select">
+                        <option value="">All Species</option>
+                    </select>
+                </div>
+
+                <!-- Stats Display -->
+                <div class="stats-display">
+                    <span class="stat-number" id="total-records">0</span>
+                    <span class="stat-label">Total Sightings</span>
+                </div>
+
+                <!-- Display Mode Switch -->
+                <div class="control-group">
+                    <div class="display-mode-row">
+                        <h4>Display Mode</h4>
+                        <label class="switch">
+                            <input type="checkbox" id="display-mode-toggle">
+                            <span class="slider round">
+                                <span class="switch-text" data-on="Hotspots" data-off="Actual">Actual</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Latest Sightings Toggle -->
+                <div class="latest-toggle">
+                    <input type="checkbox" id="latest-sightings-toggle">
+                    <label for="latest-sightings-toggle">Show Recent Sightings (This Week)</label>
+                </div>
+
+            </div>
+
+            <!-- Trees Filter (Trees only) -->
+            <div class="control-group" id="trees-group" style="display: none;">
+                <h4>Tree Filter</h4>
+                <div class="species-filter">
+                    <select id="tree-select">
+                        <option value="">All Trees</option>
+                        <option value="sickle-leaved-albizia">Sickle Leaved Albizia</option>
+                        <option value="sausage-tree">Sausage Tree</option>
+                        <option value="african-mangosteen">African Mangosteen</option>
+                        <option value="camel-thorn">Camel Thorn</option>
+                    </select>
+                </div>
+
+                <!-- Stats Display -->
+                <div class="stats-display">
+                    <span class="stat-number" id="trees-count">0</span>
+                    <span class="stat-label">Total Trees</span>
+                </div>
+
+                <!-- Display Mode Switch -->
+                <div class="control-group">
+                    <div class="display-mode-row">
+                        <h4>Display Mode</h4>
+                        <label class="switch">
+                            <input type="checkbox" id="trees-display-mode-toggle">
+                            <span class="slider round">
+                                <span class="switch-text" data-on="Hotspots" data-off="Actual">Actual</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Maintenance Stats -->
+            <div class="control-group" id="maintenance-group" style="display: none;">
+                <h4>Maintenance Stats</h4>
+                <div class="stats-display">
+                    <span class="stat-number" id="maintenance-records">0</span>
+                    <span class="stat-label">Total Maintenance</span>
+                </div>
+
+                <!-- Latest Maintenance Toggle -->
+                <div class="latest-toggle">
+                    <input type="checkbox" id="latest-maintenance-toggle">
+                    <label for="latest-maintenance-toggle">Show Recent Maintenance (This Week)</label>
+                </div>
+            </div>
+
+            <!-- Incidents Stats -->
+            <div class="control-group" id="incidents-group" style="display: none;">
+                <h4>Incidents Stats</h4>
+                <div class="stats-display">
+                    <span class="stat-number" id="incident-records">0</span>
+                    <span class="stat-label">Total Incidents</span>
+                </div>
+
+                <!-- Latest Incidents Toggle -->
+                <div class="latest-toggle">
+                    <input type="checkbox" id="latest-incidents-toggle">
+                    <label for="latest-incidents-toggle">Show Recent Incidents (This Week)</label>
+                </div>
+            </div>
+
+            <!-- Water Quality Data Entry (Tuludi, Sable Alley, Little Sable) -->
+            <div class="control-group" id="water-quality-group" style="display: none;">
+                <h4>Water Quality</h4>
+
+                <!-- Location Selection -->
+                <div class="form-group">
+                    <label for="water-location-select">Location</label>
+                    <select id="water-location-select" class="view-select">
+                        <option value="">Select Location</option>
+                        <option value="tuludi">Tuludi</option>
+                        <option value="sable-alley">Sable Alley</option>
+                        <option value="little-sable">Little Sable</option>
+                    </select>
+                </div>
+
+                <!-- Water Quality Parameters -->
+                <div id="water-params" style="display: none;">
+                    <div class="form-group">
+                        <label for="cond-input">Cond (micro/cm)</label>
+                        <input type="number" id="cond-input" step="0.01" placeholder="0.00">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tds-input">TDS (ppm)</label>
+                        <input type="number" id="tds-input" step="0.01" placeholder="0.00">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="as-input">As (ppm)</label>
+                        <input type="number" id="as-input" step="0.01" placeholder="0.000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cr-input">Cr (ppm)</label>
+                        <input type="number" id="cr-input" step="0.01" placeholder="0.000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cu-input">Cu (ppm)</label>
+                        <input type="number" id="cu-input" step="0.01" placeholder="0.000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mn-input">Mn (ppm)</label>
+                        <input type="number" id="mn-input" step="0.01" placeholder="0.000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="na-input">Na (ppm)</label>
+                        <input type="number" id="na-input" step="0.01" placeholder="0.000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pb-input">Pb (ppm)</label>
+                        <input type="number" id="pb-input" step="0.01" placeholder="0.000">
+                    </div>
+
+                    <!-- Date Input -->
+                    <div class="form-group">
+                        <label for="water-date-input">Date</label>
+                        <input type="date" id="water-date-input">
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button id="submit-water-data" class="btn-submit">Submit Water Data</button>
+                </div>
+            </div>
+
+            <!-- Water Monitoring - Okavango Delta Flood -->
+            <div class="control-group" id="water-monitoring-group" style="display: none;">
+                <h4>Okavango Delta Flood Extent</h4>
+                <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">Browse water extent by date. Opens with latest.</p>
+                <div class="okavango-slider-row">
+                    <label for="okavango-date-slider" id="okavango-slider-label" style="font-size: 0.85rem; display: block; margin-bottom: 6px;">—</label>
+                    <input type="range" id="okavango-date-slider" min="0" max="0" value="0" style="width: 100%; accent-color: #3498db;" />
+                </div>
+                <button id="okavango-show-latest" class="btn-submit" style="margin-top: 10px; width: 100%;">Show Latest</button>
+            </div>
+
+            <!-- Fire Data Controls -->
+            <div class="control-group" id="vehicle-tracker-group" style="display: none;">
+                <h4>Vehicle Tracker</h4>
+                <p style="font-size: 13px; color: #6c757d; margin-bottom: 10px;">Vehicle routes from tracking data</p>
+                <div class="stats-display">
+                    <span class="stat-number" id="vehicle-tracks-count">0</span>
+                    <span class="stat-label">Tracks</span>
+                </div>
+                <button id="refresh-vehicle-tracks" class="btn-submit" style="width: 100%; margin-top: 10px;">Refresh Tracks</button>
+            </div>
+
+            <div class="control-group" id="fires-group" style="display: none;">
+                <h4>Fire Data</h4>
+
+                <!-- Sensor Type Filter -->
+                <div class="form-group">
+                    <label for="fire-sensor-select">Sensor Type</label>
+                    <select id="fire-sensor-select" class="view-select">
+                        <option value="">All Sensors</option>
+                        <option value="VIIRS">VIIRS</option>
+                        <option value="MODIS">MODIS</option>
+                    </select>
+                </div>
+
+                <!-- Days Back Filter -->
+                <div class="form-group">
+                    <label for="fire-days-select">Days Back</label>
+                    <select id="fire-days-select" class="view-select">
+                        <option value="1">1 Day</option>
+                        <option value="2">2 Days</option>
+                        <option value="3" selected>3 Days</option>
+                        <option value="4">4 Days</option>
+                        <option value="5">5 Days</option>
+                    </select>
+                </div>
+
+                <!-- Stats Display -->
+                <div class="stats-display">
+                    <span class="stat-number" id="fires-count">0</span>
+                    <span class="stat-label">Total Fires</span>
+                </div>
+
+                <!-- Refresh Button -->
+                <button id="refresh-fires" class="btn-submit" style="width: 100%; margin-top: 10px;">Refresh Fire Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Ribbon -->
+    <div class="bottom-ribbon">
+        <p>© 2025 Khwai Private Reserve Monitoring System | Developed by <a href="mailto:jonobenjamingis@gmail.com">@Jonathan Benjamin</a></p>
+    </div>
+    </div><!-- .app-main-wrap -->
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Heat Plugin -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <!-- Leaflet TextPath Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-textpath@1.2.3/leaflet.textpath.min.js"></script>
+
+    <!-- Chart.js for water monitoring graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // Moremi area map
+        // Loads local GeoJSON for boundaries/roads, fetches Firebase observations
+
+        // Configuration
+        const API_BASE_URL = 'https://moremi-pwa.vercel.app';
+        const API_KEY = '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9';
+
+        // Simple authentication function
+        function getAuthHeaders() {
+            return {
+                'x-api-key': API_KEY,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Initialize map
+        const map = L.map('map').setView([-18.8, 23.8], 10); // Center on concession area
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Layer groups for different data types
+        const boundaryLayer = L.layerGroup().addTo(map);
+        const roadsLayer = L.layerGroup().addTo(map);
+        const campsLayer = L.layerGroup().addTo(map);
+        const treesLayer = L.layerGroup().addTo(map);
+        const observationsLayer = L.layerGroup().addTo(map);
+        const firesLayer = L.layerGroup().addTo(map);
+        const vehicleTrackingLayer = L.layerGroup().addTo(map);
+
+        // Store markers by type for filtering
+        const markersByType = {
+            Sighting: [],
+            Incident: [],
+            Maintenance: []
+        };
+
+        // Species color mapping for legend
+        const speciesColors = {
+            'elephant': '#8B4513',    // Saddle brown
+            'lion': '#DC143C',        // Crimson
+            'leopard': '#DAA520',     // Goldenrod
+            'buffalo': '#228B22',     // Forest green
+            'giraffe': '#FF6347',     // Tomato
+            'zebra': '#000000',       // Black
+            'wild-dog': '#8A2BE2',    // Blue violet
+            'hyena': '#696969',       // Dim gray
+            'cheetah': '#FFD700',     // Gold
+            'hippo': '#4682B4'        // Steel blue
+        };
+
+        // Build popup HTML from full observation record (all fields from app)
+        // customHeader: optional string to use instead of default category header
+        function formatObservationPopup(obs, customHeader) {
+            const skipKeys = ['id', 'latitude', 'longitude', 'poaching_image', 'category', 'synced'];
+            const labelMap = {
+                category: 'Category', animal: 'Species', pride: 'Pride Name', leopard: 'Leopard Name',
+                activity: 'Activity', age: 'Age', incident_type: 'Incident Type', poaching_type: 'Poaching Type',
+                poached_animal: 'Poached Animal', maintenance_type: 'Type', user: 'Reported By',
+                timestamp: 'Time', synced: 'Synced', image_filename: 'Image', has_image: 'Has Image', image_path: 'Image Path'
+            };
+            let html = '';
+            if (customHeader) {
+                html += customHeader + '<br>';
+            } else if (obs.category === 'Sighting') {
+                html += '<strong>Animal Sighting</strong><br>';
+            } else if (obs.category === 'Incident') {
+                html += '<strong>Incident Report</strong><br>';
+            } else if (obs.category === 'Maintenance') {
+                html += '<strong>Maintenance Activity</strong><br>';
+            } else {
+                html += '<strong>Observation</strong><br>';
+            }
+            const order = ['animal', 'pride', 'leopard', 'activity', 'age', 'incident_type', 'poaching_type', 'poached_animal', 'maintenance_type', 'user', 'timestamp'];
+            const shown = new Set();
+            order.forEach(k => {
+                if (obs[k] != null && obs[k] !== '' && !skipKeys.includes(k)) {
+                    const label = labelMap[k] || k.replace(/_/g, ' ');
+                    const val = k === 'timestamp' ? new Date(obs[k]).toLocaleString() : String(obs[k]);
+                    html += `<strong>${label}:</strong> ${val}<br>`;
+                    shown.add(k);
+                }
+            });
+            // Show any other fields from the full record
+            Object.keys(obs).forEach(k => {
+                if (!shown.has(k) && !skipKeys.includes(k) && obs[k] != null && obs[k] !== '') {
+                    const label = (labelMap[k] || k.replace(/_/g, ' ')).replace(/\b\w/g, c => c.toUpperCase());
+                    const val = k === 'timestamp' ? new Date(obs[k]).toLocaleString() : String(obs[k]);
+                    html += `<strong>${label}:</strong> ${val}<br>`;
+                }
+            });
+            if (obs.has_image || obs.image_filename) {
+                const imgUrl = `${API_BASE_URL}/api/observations/${obs.id}/image`;
+                html += `<strong>Image:</strong> <a href="${imgUrl}" target="_blank" rel="noopener">View photo</a><br>`;
+            }
+            return html;
+        }
+
+        // Tree color mapping
+        const treeColors = {
+            'sickle-leaved-albizia': '#228B22',    // Forest green
+            'sausage-tree': '#8B4513',             // Saddle brown
+            'african-mangosteen': '#FFD700',       // Gold
+            'camel-thorn': '#DAA520'               // Goldenrod
+        };
+
+        // Tree data
+        let allTrees = [];
+
+        // Current view state
+        let currentView = 'sightings';
+        let displayMode = 'actual'; // 'actual' or 'hotspot'
+        let allObservations = [];
+        let latestMarkers = [];
+        let speciesLegend = null;
+
+        // Fire data state
+        let allFires = [];
+        let fireMarkers = [];
+
+        // Vehicle tracking state
+        let allVehicleTracks = [];
+        const VEHICLE_COLORS = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#e91e63', '#00bcd4'];
+
+        // Water monitoring locations
+        const waterMonitoringLocations = {
+            'tuludi': {
+                name: 'Tuludi',
+                coords: [-19.138159, 23.564946],
+                data: []
+            },
+            'sable-alley': {
+                name: 'Sable Alley',
+                coords: [-19.128241, 23.661295],
+                data: []
+            },
+            'little-sable': {
+                name: 'Little Sable',
+                coords: [-19.151743, 23.695365],
+                data: []
+            }
+        };
+
+        /** Match GeoJSON camp labels (e.g. "Tuludi Camp") to water-monitoring API keys */
+        function campNameToWaterMonitoringKey(campName) {
+            const raw = (campName || '').toLowerCase().replace(/\s+camp\s*$/i, '').trim();
+            if (raw.includes('little sable')) return 'little-sable';
+            if (raw.includes('tuludi')) return 'tuludi';
+            if (raw.includes('sable alley')) return 'sable-alley';
+            return null;
+        }
+
+        function campLocationPopupExtras(campName) {
+            const wk = campNameToWaterMonitoringKey(campName);
+            let html = '<a href="#" class="show-weather-btn">Weather ▸</a>';
+            if (wk) {
+                html += ` <a href="#" class="show-water-quality-btn" data-water-key="${wk}">Water quality ▸</a>`;
+            }
+            return html;
+        }
+
+        // Water monitoring markers
+        let waterMonitoringMarkers = [];
+
+        // Okavango Delta flood extent
+        const OKAVANGO_FIREBASE = 'https://okavango-delta-water-default-rtdb.firebaseio.com';
+        let okavangoWaterLayer = null;
+        let okavangoAvailableDates = [];
+
+        // Simple marker icons - just colored points
+        const createCustomIcon = (color) => {
+            return L.divIcon({
+                className: 'simple-marker',
+                html: `<div style="
+                    background-color: ${color};
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    border: 1px solid #000;
+                "></div>`,
+                iconSize: [8, 8],
+                iconAnchor: [4, 4]
+            });
+        };
+
+
+        const sightingIcon = createCustomIcon('#8B4513');  // Saddle brown for sightings
+        const incidentIcon = createCustomIcon('#DC143C');   // Crimson for incidents
+        const maintenanceIcon = createCustomIcon('#DAA520'); // Goldenrod for maintenance
+
+        // SVG icons for specific incident/maintenance types
+        const createSvgIcon = (svgPath, size = 24) => L.divIcon({
+            className: 'svg-marker-icon',
+            html: `<img src="${svgPath}" alt="" style="width:${size}px;height:${size}px;display:block;">`,
+            iconSize: [size, size],
+            iconAnchor: [size / 2, size],
+            popupAnchor: [0, -size]
+        });
+        const skullIcon = createSvgIcon('data/icons/skull.svg');
+        const noEntryIcon = createSvgIcon('data/icons/no_entry.svg');
+        const sawMaintenanceIcon = createSvgIcon('data/icons/saw_maintenance.svg');
+
+        function getObservationIcon(observation) {
+            if (observation.category === 'Incident') {
+                const incType = (observation.incident_type || '').toLowerCase();
+                const poachType = (observation.poaching_type || '').toLowerCase();
+                if (incType.includes('poach') || poachType) return skullIcon;
+                return incidentIcon;
+            }
+            if (observation.category === 'Maintenance') {
+                const maintType = (observation.maintenance_type || '').toLowerCase();
+                if (maintType.includes('road closure')) return noEntryIcon;
+                if (maintType.includes('overgrown') || maintType.includes('pruning')) return sawMaintenanceIcon;
+                return maintenanceIcon;
+            }
+            return null;
+        }
+
+        // Hide loading message
+        function hideLoading() {
+            const loading = document.getElementById('loading');
+            if (loading) loading.style.display = 'none';
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 5000);
+        }
+
+        // Load concession boundary from local file
+        async function loadBoundary() {
+            try {
+                console.log('Loading concession boundary...');
+                const response = await fetch('data/geojson/Moremi_boundary.geojson');
+                if (!response.ok) throw new Error(`Boundary file not found: ${response.status}`);
+
+                const geoJson = await response.json();
+                console.log('Boundary data loaded:', geoJson);
+
+                L.geoJSON(geoJson, {
+                    style: {
+                        color: '#2D1810',     // Dark brown border
+                        weight: 4,
+                        opacity: 0.9,
+                        fillColor: '#DEB887',  // Tan fill
+                        fillOpacity: 0.3
+                    }
+                }).addTo(boundaryLayer);
+
+                // Fit map to boundary bounds
+                if (geoJson.features && geoJson.features.length > 0) {
+                    const bounds = L.geoJSON(geoJson).getBounds();
+                    map.fitBounds(bounds, { padding: [20, 20] });
+                }
+
+            } catch (error) {
+                console.error('Error loading boundary:', error);
+                showError('Failed to load concession boundary data');
+            }
+        }
+
+        // Store road layers for zoom-based label management
+        let roadLayers = [];
+
+        // Function to update road labels based on zoom level
+        function updateRoadLabels() {
+            const zoom = map.getZoom();
+            const minZoom = 14; // Only show labels at zoom 14 or higher (reduced overlap)
+
+            roadLayers.forEach(({ layer, roadName }) => {
+                // Clear existing text
+                layer.setText(null);
+
+                if (zoom >= minZoom) {
+                    // Simply apply text - let it follow the natural path direction
+                    layer.setText('  ' + roadName + '  ', {
+                        repeat: false,
+                        center: true,
+                        offset: 8,
+                        below: false,
+                        attributes: {
+                            'font-size': '13px',
+                            'font-weight': 'bold',
+                            'font-family': 'Arial, sans-serif',
+                            'fill': '#000',
+                            'stroke': '#fff',
+                            'stroke-width': '3.5',
+                            'paint-order': 'stroke',
+                            'stroke-opacity': '0.9',
+                            'letter-spacing': '1.5'
+                        }
+                    });
+                }
+            });
+        }
+
+        // Check if a coordinate array would create upside-down text
+        function shouldReverseCoords(coords) {
+            if (!coords || coords.length < 2) return false;
+
+            // Get start and end points
+            const start = coords[0];
+            const end = coords[coords.length - 1];
+
+            // Calculate the overall direction
+            const dx = end[0] - start[0]; // longitude difference
+            const dy = end[1] - start[1]; // latitude difference
+
+            // Calculate angle in degrees
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+            // Reverse if angle would make text upside-down
+            // (pointing generally westward or southward: angle > 90 or < -90)
+            return (angle > 90 || angle < -90);
+        }
+
+        // Load roads from local file
+        async function loadRoads() {
+            try {
+                console.log('Loading roads...');
+                const response = await fetch('data/geojson/Moremi_roads.geojson');
+                if (!response.ok) throw new Error(`Roads file not found: ${response.status}`);
+
+                const geoJson = await response.json();
+                console.log('Roads data loaded, features:', geoJson.features ? geoJson.features.length : 'none');
+
+                // Pre-process features to reverse upside-down segments
+                geoJson.features.forEach(feature => {
+                    if (feature.geometry && feature.geometry.type === 'MultiLineString') {
+                        feature.geometry.coordinates = feature.geometry.coordinates.map(lineString => {
+                            // Check if this linestring would create upside-down text
+                            if (shouldReverseCoords(lineString)) {
+                                return [...lineString].reverse();
+                            }
+                            return lineString;
+                        });
+                    } else if (feature.geometry && feature.geometry.type === 'LineString') {
+                        if (shouldReverseCoords(feature.geometry.coordinates)) {
+                            feature.geometry.coordinates = [...feature.geometry.coordinates].reverse();
+                        }
+                    }
+                });
+
+                const roadsGeoJson = L.geoJSON(geoJson, {
+                    style: {
+                        color: '#000',
+                        weight: 2,
+                        opacity: 0.9
+                    },
+                    onEachFeature: function (feature, layer) {
+                        const roadName = feature.properties?.Roads || feature.properties?.name;
+
+                        if (roadName) {
+                            // Add popup
+                            layer.bindPopup(`<strong>${roadName}</strong>`);
+
+                            // Store layer for zoom-based label management
+                            roadLayers.push({ layer, roadName });
+
+                            console.log('Added road:', roadName);
+                        }
+                    }
+                });
+
+                roadsGeoJson.addTo(roadsLayer);
+                console.log('Roads GeoJSON added to roadsLayer, features:', geoJson.features.length);
+
+                // Set up zoom event listener for labels
+                map.on('zoomend', updateRoadLabels);
+
+                // Initial label update
+                updateRoadLabels();
+
+            } catch (error) {
+                console.error('Error loading roads:', error);
+                showError('Failed to load roads data');
+            }
+        }
+
+        function formatCampWeather(data) {
+            const ts = data?.properties?.timeseries;
+            if (!ts || ts.length === 0) return '<em>No forecast data</em>';
+            const now = ts[0];
+            const inst = now?.data?.instant?.details || {};
+            const next1 = now?.data?.next_1_hours || now?.data?.next_6_hours || {};
+            const sym = (next1?.summary?.symbol_code || 'unknown').replace(/_/g, ' ');
+            let html = `<strong>Now:</strong> ${Math.round(inst.air_temperature ?? 0)}°C, ${sym}<br>`;
+            html += `Humidity: ${Math.round(inst.relative_humidity ?? 0)}% | Wind: ${(inst.wind_speed ?? 0).toFixed(1)} m/s<br>`;
+            html += `<strong>Forecast:</strong><br>`;
+            const byDay = new Map();
+            for (const t of ts) {
+                const dateKey = t.time.slice(0, 10);
+                if (!byDay.has(dateKey)) byDay.set(dateKey, t);
+            }
+            const dayEntries = Array.from(byDay.values()).slice(0, 6);
+            const today = new Date().toISOString().slice(0, 10);
+            for (const t of dayEntries) {
+                const dateKey = t.time.slice(0, 10);
+                const d = new Date(t.time);
+                const dayLabel = dateKey === today ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' });
+                const temp = t?.data?.instant?.details?.air_temperature;
+                const sym2 = (t?.data?.next_1_hours || t?.data?.next_6_hours || t?.data?.next_12_hours)?.summary?.symbol_code || '—';
+                html += `${dayLabel}: ${Math.round(temp ?? 0)}°C, ${String(sym2).replace(/_/g, ' ')}<br>`;
+            }
+            html += `<br><small>Data from <a href="https://www.met.no/" target="_blank" rel="noopener">MET Norway</a></small>`;
+            return html;
+        }
+
+        // Load camps from local file
+        async function loadCamps() {
+            try {
+                console.log('Loading camps...');
+                const response = await fetch('data/geojson/Camps.geojson');
+                if (!response.ok) throw new Error(`Camps file not found: ${response.status}`);
+
+                const geoJson = await response.json();
+                console.log('Camps data loaded:', geoJson);
+
+                // Create a custom icon for camps (2x size, white border)
+                const campIcon = L.divIcon({
+                    className: 'camp-svg-icon',
+                    html: '<img src="data/icons/KPR.svg" alt="camp" style="width:48px;height:48px;display:block;">',
+                    iconSize: [48, 48],
+                    iconAnchor: [24, 48],
+                    popupAnchor: [0, -48]
+                });
+
+                L.geoJSON(geoJson, {
+                    pointToLayer: function(feature, latlng) {
+                        return L.marker(latlng, { icon: campIcon });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const campName = feature.properties?.Camps || 'Camp';
+                        const latlng = layer.getLatLng();
+                        const initialHtml = `<strong>${campName}</strong><br><em>Camp Location</em><br>${campLocationPopupExtras(campName)}`;
+                        layer.bindPopup(initialHtml);
+                        layer.on('popupclose', function() { layer.setPopupContent(initialHtml); });
+                        layer.on('popupopen', function() {
+                            const root = layer.getPopup()?.getElement?.();
+                            if (!root || root.dataset.kprCampPopupBound) return;
+                            root.dataset.kprCampPopupBound = '1';
+                            root.addEventListener('click', function(ev) {
+                                const wq = ev.target.closest('.show-water-quality-btn');
+                                if (wq) {
+                                    ev.preventDefault();
+                                    const key = wq.getAttribute('data-water-key');
+                                    if (key && window.showWaterMonitoringGraph) window.showWaterMonitoringGraph(key);
+                                    return;
+                                }
+                                const weather = ev.target.closest('.show-weather-btn');
+                                if (!weather) return;
+                                ev.preventDefault();
+                                weather.textContent = 'Loading…';
+                                const lat = latlng.lat.toFixed(4);
+                                const lon = latlng.lng.toFixed(4);
+                                const wk = campNameToWaterMonitoringKey(campName);
+                                const waterLine = wk
+                                    ? `<br><button type="button" class="chart-open-water-btn" onclick="showWaterMonitoringGraph('${wk}')" style="margin-top:8px;padding:4px 10px;font-size:12px;cursor:pointer;">Water quality trends ▸</button>`
+                                    : '';
+                                (async function() {
+                                    try {
+                                        const res = await fetch(
+                                            `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`,
+                                            { headers: { 'User-Agent': 'KPR-Monitoring-Dashboard/1.0 jonobenjamingis@gmail.com' } }
+                                        );
+                                        if (!res.ok) throw new Error(res.statusText);
+                                        const data = await res.json();
+                                        const weatherHtml = formatCampWeather(data);
+                                        layer.setPopupContent(`<strong>${campName}</strong><br><em>Camp Location</em><br>${weatherHtml}${waterLine}`);
+                                    } catch (err) {
+                                        layer.setPopupContent(`<strong>${campName}</strong><br><em>Camp Location</em><br><em style="color:#c00;">Weather unavailable: ${err.message}</em>${waterLine}`);
+                                    }
+                                })();
+                            });
+                        });
+                    }
+                }).addTo(campsLayer);
+
+                console.log('Camps loaded successfully');
+
+            } catch (error) {
+                console.error('Error loading camps:', error);
+                showError('Failed to load camps data');
+            }
+        }
+
+        // Load trees from local file
+        async function loadTrees() {
+            try {
+                console.log('Loading trees...');
+                const response = await fetch('data/geojson/Wrapped_trees.geojson');
+                if (!response.ok) throw new Error(`Trees file not found: ${response.status}`);
+
+                const geoJson = await response.json();
+                console.log('Trees data loaded:', geoJson);
+
+                allTrees = geoJson.features || [];
+                console.log('Trees loaded successfully, count:', allTrees.length);
+
+                // Log unique tree species for debugging
+                const uniqueSpecies = [...new Set(allTrees.map(tree => tree.properties?.Species).filter(Boolean))];
+                console.log('Unique tree species:', uniqueSpecies);
+
+            } catch (error) {
+                console.error('Error loading trees:', error);
+                showError('Failed to load trees data');
+            }
+        }
+
+        // Load observations
+        async function loadObservations() {
+            try {
+                console.log('Loading observations...');
+                const response = await fetch(`${API_BASE_URL}/api/observations`, {
+                    headers: getAuthHeaders()
+                });
+                if (!response.ok) throw new Error(`Observations API returned ${response.status}`);
+
+                const data = await response.json();
+                console.log('Observations data loaded:', data);
+                console.log('Number of observations received:', data.data ? data.data.length : 0);
+
+                if (data.success && data.data) {
+                    allObservations = data.data;
+                    console.log('Sample observations:', allObservations.slice(0, 3).map(obs => ({
+                        category: obs.category,
+                        timestamp: obs.timestamp,
+                        animal: obs.animal,
+                        lat: obs.latitude,
+                        lng: obs.longitude
+                    })));
+
+                    // Log unique animal names for debugging
+                    const uniqueAnimals = [...new Set(allObservations.filter(obs => obs.category === 'Sighting').map(obs => obs.animal).filter(Boolean))];
+                    console.log('Unique animal names in data:', uniqueAnimals);
+
+
+                    allObservations.forEach(observation => {
+                        if (observation.latitude && observation.longitude) {
+                            let icon, popupContent;
+
+                            switch (observation.category) {
+                                case 'Sighting':
+                                    const animalName = (observation.animal || '').toLowerCase().replace(/\s+/g, '-');
+                                    const speciesColor = speciesColors[animalName] || '#8B4513';
+                                    icon = createCustomIcon(speciesColor);
+                                    popupContent = formatObservationPopup(observation);
+                                    break;
+                                case 'Incident':
+                                    icon = getObservationIcon(observation) || incidentIcon;
+                                    popupContent = formatObservationPopup(observation);
+                                    break;
+                                case 'Maintenance':
+                                    icon = getObservationIcon(observation) || maintenanceIcon;
+                                    popupContent = formatObservationPopup(observation);
+                                    break;
+                                default:
+                                    icon = sightingIcon;
+                                    popupContent = formatObservationPopup(observation);
+                            }
+
+                            const marker = L.marker([observation.latitude, observation.longitude], { icon })
+                                .bindPopup(popupContent);
+
+                            // Add marker to map layer
+                            marker.addTo(observationsLayer);
+
+                            // Store marker by type for filtering
+                            if (markersByType[observation.category]) {
+                                markersByType[observation.category].push(marker);
+                            }
+                        }
+                    });
+
+                    // Apply current filters and view (applyFilters calls updateStats)
+                    applyFilters();
+
+                    // Show species legend at startup if in sightings mode
+                    if (currentView === 'sightings' && displayMode === 'actual') {
+                        showSpeciesLegend();
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading observations:', error);
+                showError('Failed to load observation data. Check your connection and try again.');
+            }
+        }
+
+        // Initialize map data loading
+        async function initMap() {
+            try {
+                await Promise.all([
+                    loadBoundary(),
+                    loadRoads(),
+                    loadCamps(),
+                    loadTrees(),
+                    loadObservations()
+                ]);
+
+                hideLoading();
+                // Ensure legend shows for sightings when returning to page (e.g. from bfcache or after full load)
+                if (currentView === 'sightings' && displayMode === 'actual') {
+                    showSpeciesLegend();
+                }
+                console.log('Map initialization complete');
+            } catch (error) {
+                console.error('Error initializing map:', error);
+                hideLoading();
+                showError('Failed to initialize map data. Check your connection and try again.');
+            }
+        }
+
+        // Filter and control functions
+        function toggleMarkers(type, show) {
+            markersByType[type].forEach(marker => {
+                if (show) {
+                    if (!observationsLayer.hasLayer(marker)) {
+                        marker.addTo(observationsLayer);
+                    }
+                } else {
+                    if (observationsLayer.hasLayer(marker)) {
+                        observationsLayer.removeLayer(marker);
+                    }
+                }
+            });
+        }
+
+        function clearLatestMarkers() {
+            latestMarkers.forEach(marker => {
+                if (observationsLayer.hasLayer(marker)) {
+                    observationsLayer.removeLayer(marker);
+                }
+            });
+            latestMarkers = [];
+        }
+
+        // Default color for species not in speciesColors
+        const DEFAULT_SPECIES_COLOR = '#8B4513';
+
+        function getColorForSpecies(animalName) {
+            const key = (animalName || '').toLowerCase().replace(/\s+/g, '-');
+            if (speciesColors[key]) return speciesColors[key];
+            if (!animalName || !String(animalName).trim()) return DEFAULT_SPECIES_COLOR;
+            let hash = 0;
+            for (let i = 0; i < key.length; i++) {
+                hash = key.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash % 360);
+            return `hsl(${hue}, 65%, 45%)`;
+        }
+
+        function showSpeciesLegend(visibleSpeciesList) {
+            // Remove existing legend
+            if (speciesLegend) {
+                map.removeControl(speciesLegend);
+            }
+
+            // Use passed list or last computed (for callers that don't have filtered data)
+            const toShow = visibleSpeciesList != null ? visibleSpeciesList : lastVisibleSpecies;
+            lastVisibleSpecies = toShow || [];
+
+            if (toShow.length === 0) return;
+
+            // toShow is array of { displayName, color } - use observation's actual Species name
+            const speciesToShow = toShow;
+
+            // Create new legend
+            speciesLegend = L.control({ position: 'topright' });
+
+            speciesLegend.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'species-legend');
+                div.innerHTML = `
+                    <h4>Species Legend</h4>
+                    ${speciesToShow.map(({ displayName, color }) => `
+                        <div class="species-item">
+                            <div class="species-dot" style="background-color: ${color}"></div>
+                            <span class="species-name">${(displayName || 'Unknown').replace(/</g, '&lt;')}</span>
+                        </div>
+                    `).join('')}
+                `;
+                return div;
+            };
+
+            speciesLegend.addTo(map);
+        }
+
+        function hideSpeciesLegend() {
+            if (speciesLegend) {
+                map.removeControl(speciesLegend);
+                speciesLegend = null;
+            }
+        }
+
+        function showTreesLegend() {
+            // Remove existing legend
+            if (speciesLegend) {
+                map.removeControl(speciesLegend);
+            }
+
+            // Create new legend
+            speciesLegend = L.control({ position: 'topright' });
+
+            speciesLegend.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'species-legend');
+                div.innerHTML = `
+                    <h4>Tree Species</h4>
+                    ${Object.entries(treeColors).map(([species, color]) => `
+                        <div class="species-item">
+                            <div class="species-dot" style="background-color: ${color}"></div>
+                            <span class="species-name">${species.replace('-', ' ')}</span>
+                        </div>
+                    `).join('')}
+                `;
+                return div;
+            };
+
+            speciesLegend.addTo(map);
+        }
+
+        function hideTreesLegend() {
+            hideSpeciesLegend(); // Reuse the same function since they use the same variable
+        }
+
+        function showFiresLegend() {
+            // Remove existing legend
+            if (speciesLegend) {
+                map.removeControl(speciesLegend);
+            }
+
+            // Create new legend
+            speciesLegend = L.control({ position: 'topright' });
+
+            speciesLegend.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'species-legend');
+                div.innerHTML = `
+                    <h4>Fire Sensors</h4>
+                    <div class="species-item">
+                        <div class="species-dot" style="background-color: red; width: 12px; height: 12px; border-radius: 50%;"></div>
+                        <span class="species-name">VIIRS (High Resolution)</span>
+                    </div>
+                    <div class="species-item">
+                        <div class="species-dot" style="background-color: orange; width: 10px; height: 10px; border-radius: 50%;"></div>
+                        <span class="species-name">MODIS (Moderate Resolution)</span>
+                    </div>
+                `;
+                return div;
+            };
+
+            speciesLegend.addTo(map);
+        }
+
+        function hideFiresLegend() {
+            hideSpeciesLegend(); // Reuse the same function since they use the same variable
+        }
+
+        // Show water monitoring markers
+        function showWaterMonitoringMarkers() {
+            // Clear existing water monitoring markers
+            hideWaterMonitoringMarkers();
+
+            // Create blue dot icon for water monitoring (similar to species markers but blue)
+            const waterMonitoringIcon = L.divIcon({
+                className: 'water-monitoring-marker',
+                html: `<div style="
+                    background-color: #1e90ff;
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    border: 2px solid #ffffff;
+                    box-shadow: 0 0 6px rgba(30, 144, 255, 0.6);
+                "></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+
+            Object.entries(waterMonitoringLocations).forEach(([locationKey, location]) => {
+                const marker = L.marker(location.coords, {
+                    icon: waterMonitoringIcon
+                })
+                .bindPopup(`
+                    <strong>${location.name}</strong><br>
+                    <em>Water Monitoring Location</em><br>
+                    <button type="button" onclick="showWaterMonitoringGraph('${locationKey}')">View Trends</button>
+                `)
+                .addTo(map);
+
+                waterMonitoringMarkers.push(marker);
+            });
+        }
+
+        // Hide water monitoring markers
+        function hideWaterMonitoringMarkers() {
+            waterMonitoringMarkers.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            waterMonitoringMarkers = [];
+        }
+
+        // ——— Okavango Delta Flood Extent ———
+        function hideOkavangoWater() {
+            if (okavangoWaterLayer) {
+                map.removeLayer(okavangoWaterLayer);
+                okavangoWaterLayer = null;
+            }
+        }
+
+        function formatOkavangoDate(yyyymmdd) {
+            if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd;
+            return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+        }
+
+        function showOkavangoWater(geojson, dateLabel) {
+            hideOkavangoWater();
+            okavangoWaterLayer = L.geoJSON(geojson, {
+                style: {
+                    fillColor: '#58a6ff',
+                    fillOpacity: 0.45,
+                    color: '#58a6ff',
+                    weight: 1,
+                    opacity: 0.7,
+                },
+            }).addTo(map);
+            const bounds = okavangoWaterLayer.getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+        }
+
+        async function fetchOkavangoDateFromFirebase(dateStr) {
+            const url = `${OKAVANGO_FIREBASE}/okavango/water/by_date/${dateStr}.json`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(res.statusText);
+            const data = await res.json();
+            const geojson = typeof data?.geojson === 'string' ? JSON.parse(data.geojson) : data;
+            if (!geojson?.type || !Array.isArray(geojson.features)) throw new Error('Invalid GeoJSON');
+            return geojson;
+        }
+
+        async function loadOkavangoDateByIndex(index) {
+            if (okavangoAvailableDates.length === 0) return;
+            const dateStr = okavangoAvailableDates[index];
+            try {
+                const geojson = await fetchOkavangoDateFromFirebase(dateStr);
+                showOkavangoWater(geojson, formatOkavangoDate(dateStr));
+                const label = document.getElementById('okavango-slider-label');
+                if (label) label.textContent = formatOkavangoDate(dateStr);
+            } catch (e) {
+                console.error('Okavango load error:', e);
+            }
+        }
+
+        async function loadOkavangoFromFirebase() {
+            try {
+                const shallowRes = await fetch(`${OKAVANGO_FIREBASE}/okavango/water/by_date.json?shallow=true`);
+                if (!shallowRes.ok) throw new Error(shallowRes.statusText);
+                const byDate = await shallowRes.json();
+                okavangoAvailableDates = Object.keys(byDate || {}).filter(k => /^\d{8}$/.test(k)).sort();
+                const slider = document.getElementById('okavango-date-slider');
+                const label = document.getElementById('okavango-slider-label');
+                if (!slider || !label) return;
+                if (okavangoAvailableDates.length === 0) {
+                    const latestRes = await fetch(`${OKAVANGO_FIREBASE}/okavango/water/latest.json`);
+                    if (!latestRes.ok) throw new Error(latestRes.statusText);
+                    const data = await latestRes.json();
+                    const geojson = typeof data?.geojson === 'string' ? JSON.parse(data.geojson) : data;
+                    if (!geojson?.type || !Array.isArray(geojson.features)) throw new Error('No water data yet');
+                    showOkavangoWater(geojson, 'Latest');
+                    label.textContent = 'Latest';
+                    slider.min = 0;
+                    slider.max = 0;
+                    slider.value = 0;
+                    slider.style.display = 'none';
+                    return;
+                }
+                slider.min = 0;
+                slider.max = Math.max(0, okavangoAvailableDates.length - 1);
+                slider.value = okavangoAvailableDates.length - 1;
+                slider.style.display = '';
+                await loadOkavangoDateByIndex(okavangoAvailableDates.length - 1);
+            } catch (e) {
+                console.error('Okavango Firebase load error:', e);
+            }
+        }
+
+        // Show water monitoring graph for a location
+        window.showWaterMonitoringGraph = function(locationKey) {
+            const location = waterMonitoringLocations[locationKey];
+            if (!location) return;
+
+            // Load water monitoring data for this location
+            loadWaterMonitoringData(locationKey).then(data => {
+                if (data && data.length > 0) {
+                    showWaterMonitoringChart(location.name, data);
+                } else {
+                    alert(`No water monitoring data available for ${location.name}`);
+                }
+            });
+        };
+
+        // Load water monitoring data for a location
+        async function loadWaterMonitoringData(locationKey) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/water-monitoring?location=${locationKey}`, {
+                    headers: getAuthHeaders()
+                });
+                if (!response.ok) throw new Error(`Failed to load water monitoring data`);
+
+                const data = await response.json();
+                return data.success ? data.data : [];
+            } catch (error) {
+                console.error('Error loading water monitoring data:', error);
+                return [];
+            }
+        }
+
+        // Show water monitoring chart
+        function showWaterMonitoringChart(locationName, data) {
+            // Create modal or overlay for chart
+            const chartModal = document.createElement('div');
+            chartModal.className = 'chart-modal';
+            chartModal.innerHTML = `
+                <div class="chart-modal-content">
+                    <div class="chart-modal-header">
+                        <h3>Water Quality Trends - ${locationName}</h3>
+                        <button class="chart-close-btn">&times;</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="waterChart"></canvas>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(chartModal);
+
+            // Close modal functionality
+            chartModal.querySelector('.chart-close-btn').onclick = () => {
+                document.body.removeChild(chartModal);
+            };
+
+            chartModal.onclick = (e) => {
+                if (e.target === chartModal) {
+                    document.body.removeChild(chartModal);
+                }
+            };
+
+            // Prepare data for Chart.js
+            const sortedData = data.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            const chartData = {
+                labels: sortedData.map(d => new Date(d.date).toLocaleDateString()),
+                datasets: [
+                    {
+                        label: 'Conductivity (micro/cm)',
+                        data: sortedData.map(d => d.cond),
+                        borderColor: '#ff6384',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'TDS (ppm)',
+                        data: sortedData.map(d => d.tds),
+                        borderColor: '#36a2eb',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Arsenic (ppm)',
+                        data: sortedData.map(d => d.as),
+                        borderColor: '#cc65fe',
+                        backgroundColor: 'rgba(204, 101, 254, 0.1)',
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Chromium (ppm)',
+                        data: sortedData.map(d => d.cr),
+                        borderColor: '#ff9f40',
+                        backgroundColor: 'rgba(255, 159, 64, 0.1)',
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Copper (ppm)',
+                        data: sortedData.map(d => d.cu),
+                        borderColor: '#ffcd56',
+                        backgroundColor: 'rgba(255, 205, 86, 0.1)',
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Manganese (ppm)',
+                        data: sortedData.map(d => d.mn),
+                        borderColor: '#4bc0c0',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Sodium (ppm)',
+                        data: sortedData.map(d => d.na),
+                        borderColor: '#c9cbcf',
+                        backgroundColor: 'rgba(201, 203, 207, 0.1)',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Lead (ppm)',
+                        data: sortedData.map(d => d.pb),
+                        borderColor: '#ff6384',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        yAxisID: 'y1'
+                    }
+                ]
+            };
+
+            const config = {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Conductivity, TDS, Sodium (ppm)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Heavy Metals (ppm)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
+                    }
+                }
+            };
+
+            new Chart(document.getElementById('waterChart'), config);
+        }
+
+        // Clear sightings markers (when switching to trees/fires/water)
+        function clearSightingsMarkers() {
+            observationsLayer.clearLayers();
+            clearLatestMarkers();
+            // Legend visibility is managed by view mode handler, not here
+        }
+
+        function clearFireMarkers() {
+            // Clear all fire markers
+            firesLayer.clearLayers();
+            fireMarkers = [];
+            // Hide fire legend when clearing markers
+            hideFiresLegend();
+        }
+
+        // Vehicle tracker: clear tracks and legend
+        function clearVehicleTracks() {
+            vehicleTrackingLayer.clearLayers();
+            allVehicleTracks = [];
+            if (speciesLegend) {
+                map.removeControl(speciesLegend);
+                speciesLegend = null;
+            }
+        }
+
+        // Fetch vehicle tracking data from API
+        async function loadVehicleTracking() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/tracking`, { headers: getAuthHeaders() });
+                if (!response.ok) throw new Error(`Tracking API returned ${response.status}`);
+                const data = await response.json();
+                if (data.success && data.data) {
+                    allVehicleTracks = data.data.filter(t => (t.trackingType || '').toLowerCase() === 'vehicle');
+                    displayVehicleTracks();
+                } else {
+                    allVehicleTracks = [];
+                    displayVehicleTracks();
+                }
+            } catch (error) {
+                console.error('Error loading vehicle tracks:', error);
+                allVehicleTracks = [];
+                displayVehicleTracks();
+            }
+        }
+
+        // Display vehicle tracks as LineStrings on map
+        function displayVehicleTracks() {
+            vehicleTrackingLayer.clearLayers();
+
+            const vehicles = [...new Set(allVehicleTracks.map(t => (t.vehicle || 'Unknown').trim() || 'Unknown'))].sort();
+            const vehicleColorMap = {};
+            vehicles.forEach((v, i) => {
+                vehicleColorMap[v] = VEHICLE_COLORS[i % VEHICLE_COLORS.length];
+            });
+
+            allVehicleTracks.forEach(track => {
+                const geoJson = typeof track.geoJson === 'string' ? JSON.parse(track.geoJson) : track.geoJson;
+                if (!geoJson) return;
+                // PWA sends GeoJSON Feature: { type, geometry: { type: 'LineString', coordinates } }
+                const rawCoords = (geoJson.geometry && geoJson.geometry.coordinates) || geoJson.coordinates;
+                if (!rawCoords || !Array.isArray(rawCoords) || rawCoords.length < 2) return;
+
+                const coords = rawCoords.map(c => [c[1], c[0]]); // GeoJSON [lng,lat] -> Leaflet [lat,lng]
+                const vehicle = (track.vehicle || 'Unknown').trim() || 'Unknown';
+                const color = vehicleColorMap[vehicle] || '#666';
+
+                const polyline = L.polyline(coords, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8
+                }).bindPopup(`
+                    <strong>Vehicle ${vehicle}</strong><br>
+                    Driver: ${(track.user || 'Unknown')}<br>
+                    Start: ${track.startTime ? new Date(track.startTime).toLocaleString() : '-'}<br>
+                    End: ${track.endTime ? new Date(track.endTime).toLocaleString() : '-'}<br>
+                    Distance: ${track.distanceMeters != null ? (track.distanceMeters / 1000).toFixed(2) + ' km' : '-'}
+                `).addTo(vehicleTrackingLayer);
+            });
+
+            document.getElementById('vehicle-tracks-count').textContent = allVehicleTracks.length;
+            showVehicleTrackerLegend(allVehicleTracks);
+        }
+
+        function showVehicleTrackerLegend(tracks) {
+            if (speciesLegend) map.removeControl(speciesLegend);
+            const vehicles = [...new Set(tracks.map(t => (t.vehicle || 'Unknown').trim() || 'Unknown'))].sort();
+            if (vehicles.length === 0) {
+                speciesLegend = null;
+                return;
+            }
+            speciesLegend = L.control({ position: 'topright' });
+            speciesLegend.onAdd = function() {
+                const div = L.DomUtil.create('div', 'species-legend');
+                let html = '<h4>Vehicles</h4>';
+                vehicles.forEach((v, i) => {
+                    const color = VEHICLE_COLORS[i % VEHICLE_COLORS.length];
+                    html += `<div class="species-item"><div class="species-dot" style="background-color:${color};width:14px;height:4px;border-radius:2px;"></div><span class="species-name">${v}</span></div>`;
+                });
+                div.innerHTML = html;
+                return div;
+            };
+            speciesLegend.addTo(map);
+        }
+
+        // Fetch fire data from API
+        async function loadFires() {
+            try {
+                console.log('Loading fire data...');
+                const days = document.getElementById('fire-days-select').value || '3';
+                const response = await fetch(`${API_BASE_URL}/api/fires?country=USA&days=${days}`, {
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) throw new Error(`Fires API returned ${response.status}`);
+
+                const data = await response.json();
+                console.log('Fire data loaded:', data);
+
+                if (data && data.features) {
+                    allFires = data.features;
+                    console.log('Fire data loaded successfully, count:', allFires.length);
+                    displayFires();
+                } else {
+                    allFires = [];
+                    showError('No fire data available');
+                }
+
+            } catch (error) {
+                console.error('Error loading fire data:', error);
+                showError('Failed to load fire data. Check your connection and try again.');
+                allFires = [];
+            }
+        }
+
+        // Display fire markers
+        function displayFires() {
+            // Clear existing fire markers
+            clearFireMarkers();
+
+            const selectedSensor = document.getElementById('fire-sensor-select').value;
+
+            // Filter fires by sensor type only (show all Africa fires)
+            const filteredFires = allFires.filter(fire => {
+                // Check sensor type
+                if (selectedSensor && fire.properties && fire.properties.sensor !== selectedSensor) {
+                    return false;
+                }
+
+                // Include all fires with valid coordinates
+                return fire.geometry && fire.geometry.coordinates;
+            });
+
+            console.log('Displaying', filteredFires.length, 'fires from', allFires.length, 'total');
+
+            filteredFires.forEach(fire => {
+                if (fire.geometry && fire.geometry.coordinates) {
+                    const coords = fire.geometry.coordinates;
+                    const properties = fire.properties || {};
+
+                    // Create marker based on sensor type
+                    let marker;
+                    if (properties.sensor === "VIIRS") {
+                        marker = L.circleMarker([coords[1], coords[0]], {
+                            radius: 6,
+                            color: "red",
+                            fillColor: "red",
+                            fillOpacity: 0.8,
+                            weight: 2
+                        });
+                    } else {
+                        // MODIS
+                        marker = L.circleMarker([coords[1], coords[0]], {
+                            radius: 5,
+                            color: "orange",
+                            fillColor: "orange",
+                            fillOpacity: 0.7,
+                            weight: 2
+                        });
+                    }
+
+                    // Create popup content
+                    const popupContent = `
+                        <strong>${properties.sensor || 'Unknown'} Fire Detection</strong><br>
+                        <strong>Confidence:</strong> ${properties.confidence || 'N/A'}%<br>
+                        <strong>FRP:</strong> ${properties.frp || 'N/A'} MW<br>
+                        <strong>Brightness:</strong> ${properties.brightness || 'N/A'} K<br>
+                        <strong>Time:</strong> ${properties.acq_time ? formatAcqTime(properties.acq_time) : 'N/A'}<br>
+                        <strong>Date:</strong> ${properties.acq_date || 'N/A'}<br>
+                        <small>Lat: ${coords[1].toFixed(4)}, Lng: ${coords[0].toFixed(4)}</small>
+                    `;
+
+                    marker.bindPopup(popupContent);
+                    marker.addTo(firesLayer);
+                    fireMarkers.push(marker);
+                }
+            });
+
+            // Update fire count and label
+            document.getElementById('fires-count').textContent = filteredFires.length;
+            const fireLabelElement = document.querySelector('#fires-group .stats-display .stat-label');
+            fireLabelElement.textContent = 'Total Fires';
+
+            // Show fire legend
+            showFiresLegend();
+        }
+
+        // Format acquisition time (HHMM format to HH:MM)
+        function formatAcqTime(acqTime) {
+            if (!acqTime || typeof acqTime !== 'string') return 'N/A';
+            const timeStr = acqTime.toString().padStart(4, '0');
+            return `${timeStr.slice(0, 2)}:${timeStr.slice(2, 4)}`;
+        }
+
+
+        function populateSpeciesDropdown(observationsFilteredByDate) {
+            const speciesSelect = document.getElementById('species-select');
+            const currentValue = speciesSelect.value;
+            const speciesInRange = [...new Map(
+                observationsFilteredByDate
+                    .filter(obs => obs.category === 'Sighting' && obs.animal && String(obs.animal).trim())
+                    .map(obs => {
+                        const name = String(obs.animal).trim();
+                        const key = name.toLowerCase().replace(/\s+/g, '-');
+                        return [key, name];
+                    })
+            ).values()].sort((a, b) => a.localeCompare(b));
+            speciesSelect.innerHTML = '<option value="">All Species</option>' +
+                speciesInRange.map(name => {
+                    const val = name.toLowerCase().replace(/\s+/g, '-');
+                    return `<option value="${val}">${name.replace(/</g, '&lt;')}</option>`;
+                }).join('');
+            if (speciesInRange.some(s => s.toLowerCase().replace(/\s+/g, '-') === currentValue)) {
+                speciesSelect.value = currentValue;
+            } else {
+                speciesSelect.value = '';
+            }
+        }
+
+        function applyFilters() {
+            // Clear all markers first
+            observationsLayer.clearLayers();
+            clearLatestMarkers();
+
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const selectedMonth = document.getElementById('month-select').value;
+            const selectedYear = document.getElementById('year-select').value;
+
+            const observationsFilteredByDate = allObservations.filter(obs => {
+                if (currentView === 'sightings' && obs.category !== 'Sighting') return false;
+                if (currentView === 'maintenance' && obs.category !== 'Maintenance') return false;
+                if (currentView === 'incidents' && obs.category !== 'Incident') return false;
+                if (startDate || endDate) {
+                    const obsDate = new Date(obs.timestamp);
+                    if (startDate && obsDate < new Date(startDate)) return false;
+                    if (endDate && obsDate > new Date(endDate + 'T23:59:59')) return false;
+                }
+                if (selectedMonth || selectedYear) {
+                    const obsDate = new Date(obs.timestamp);
+                    if (selectedMonth && obsDate.getMonth() + 1 !== parseInt(selectedMonth)) return false;
+                    if (selectedYear && obsDate.getFullYear() !== parseInt(selectedYear)) return false;
+                }
+                return true;
+            });
+
+            if (currentView === 'sightings') populateSpeciesDropdown(observationsFilteredByDate);
+
+            let filteredObservations = observationsFilteredByDate;
+            if (currentView === 'sightings') {
+                const selectedSpecies = document.getElementById('species-select').value;
+                if (selectedSpecies) {
+                    const filterSpecies = selectedSpecies.toLowerCase().trim();
+                    const filterNormalized = filterSpecies.replace(/\s+/g, '-').replace(/-/g, '');
+                    filteredObservations = observationsFilteredByDate.filter(obs => {
+                        const obsAnimal = (obs.animal || '').toLowerCase().trim();
+                        const obsAnimalNormalized = obsAnimal.replace(/\s+/g, '-').replace(/-/g, '');
+                        return obsAnimal.includes(filterSpecies) || obsAnimalNormalized.includes(filterNormalized) || obsAnimal === filterSpecies;
+                    });
+                }
+            }
+
+            if (displayMode === 'hotspot') {
+                // Create heat map using Leaflet.heat plugin
+                // Use the same filtered observations as the actual mode
+                const hotspotObservations = filteredObservations.filter(obs => {
+                    return obs.latitude && obs.longitude;
+                });
+
+                const points = hotspotObservations
+                    .map(obs => [obs.latitude, obs.longitude, 1]); // [lat, lng, intensity]
+
+                console.log('Hotspot mode: showing', points.length, 'points from date-filtered observations');
+
+                if (points.length > 0) {
+                    const heatLayer = L.heatLayer(points, {
+                        radius: 25,      // smaller, denser hotspots
+                        blur: 15,        // less blur for sharper hotspots
+                        maxZoom: 17,
+                        minOpacity: 0.6, // less transparent
+                        // blue → green → yellow → red
+                        gradient: {
+                            0.0: '#2c7bb6',
+                            0.25: '#00a6ca',
+                            0.45: '#00ccbc',
+                            0.6: '#90eb9d',
+                            0.75: '#ffff8c',
+                            0.9: '#f9d057',
+                            1.0: '#d7191c'
+                        }
+                    }).addTo(observationsLayer);
+                }
+            } else {
+                // Show individual markers (actual locations)
+                filteredObservations.forEach(observation => {
+                    if (observation.latitude && observation.longitude) {
+                        let icon, popupContent;
+
+                        switch (observation.category) {
+                            case 'Sighting':
+                                icon = sightingIcon;
+                                popupContent = formatObservationPopup(observation);
+                                break;
+                            case 'Incident':
+                                icon = getObservationIcon(observation) || incidentIcon;
+                                popupContent = formatObservationPopup(observation);
+                                break;
+                            case 'Maintenance':
+                                icon = getObservationIcon(observation) || maintenanceIcon;
+                                popupContent = formatObservationPopup(observation);
+                                break;
+                            default:
+                                icon = sightingIcon;
+                                popupContent = formatObservationPopup(observation);
+                        }
+
+                            // For actual locations, use species-specific colors for sightings
+                            if (displayMode === 'actual' && observation.category === 'Sighting') {
+                                const speciesColor = getColorForSpecies(observation.animal);
+                                icon = createCustomIcon(speciesColor);
+                            }
+
+                            const marker = L.marker([observation.latitude, observation.longitude], { icon })
+                                .bindPopup(popupContent);
+
+                            marker.addTo(observationsLayer);
+                    }
+                });
+            }
+
+            // Apply latest toggles
+            applyLatestFilters();
+
+            // Handle trees display
+            displayTrees();
+
+            // Count actual data points (not visual elements - same for hotspot or actual mode)
+            const filteredPointCount = filteredObservations.filter(obs => obs.latitude && obs.longitude).length;
+            updateStats(filteredPointCount);
+
+            // Species legend: show all species from filtered observations, using actual Species name from data
+            if (currentView === 'sightings' && displayMode === 'actual') {
+                const speciesMap = new Map(); // normalizedKey -> { displayName, color }
+                filteredObservations
+                    .filter(obs => obs.category === 'Sighting' && obs.animal)
+                    .forEach(obs => {
+                        const name = String(obs.animal).trim();
+                        const key = name.toLowerCase().replace(/\s+/g, '-');
+                        if (name && !speciesMap.has(key)) {
+                            speciesMap.set(key, { displayName: name, color: getColorForSpecies(name) });
+                        }
+                    });
+                const visibleSpecies = [...speciesMap.values()]
+                    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                    .map(({ displayName, color }) => ({ displayName, color }));
+                lastVisibleSpecies = visibleSpecies;
+                showSpeciesLegend(visibleSpecies);
+            }
+        }
+
+        function applyLatestFilters() {
+            console.log('Applying latest filters');
+            clearLatestMarkers();
+
+            // Show black pins for recent observations by category
+            if (document.getElementById('latest-sightings-toggle').checked) {
+                console.log('Showing black pins for recent sightings');
+                showLatestSightings();
+            }
+
+            if (document.getElementById('latest-maintenance-toggle').checked) {
+                console.log('Showing black pins for recent maintenance');
+                showLatestMaintenance();
+            }
+
+            if (document.getElementById('latest-incidents-toggle').checked) {
+                console.log('Showing black pins for recent incidents');
+                showLatestIncidents();
+            }
+
+            console.log('Latest markers created:', latestMarkers.length);
+        }
+
+        // Display trees based on current filters
+        function displayTrees() {
+            // Clear existing trees layer
+            treesLayer.clearLayers();
+
+            if (currentView !== 'trees') {
+                return;
+            }
+
+            const selectedTree = document.getElementById('tree-select').value;
+            const treesDisplayMode = document.getElementById('trees-display-mode-toggle').checked ? 'hotspot' : 'actual';
+
+            // Filter trees
+            const filteredTrees = allTrees.filter(tree => {
+                if (!tree.properties || !tree.geometry) return false;
+
+                // Tree type filter
+                if (selectedTree) {
+                    const treeSpecies = (tree.properties.Species || '').toLowerCase().trim();
+                    const filterTree = selectedTree.toLowerCase().trim();
+
+                    // Normalize species names for matching
+                    const treeNormalized = treeSpecies.replace(/\s+/g, '-').replace(/-/g, '');
+                    const filterNormalized = filterTree.replace(/\s+/g, '-').replace(/-/g, '');
+
+                    if (!treeSpecies.includes(filterTree) &&
+                        !treeNormalized.includes(filterNormalized) &&
+                        treeSpecies !== filterTree) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            if (treesDisplayMode === 'hotspot') {
+                // Hide legend in hotspot mode
+                hideTreesLegend();
+
+                // Create heat map for trees
+                const treePoints = filteredTrees
+                    .map(tree => {
+                        const coords = tree.geometry.coordinates;
+                        return [coords[1], coords[0], 1]; // [lat, lng, intensity]
+                    })
+                    .filter(point => point[0] && point[1]);
+
+                console.log('Trees hotspot mode: showing', treePoints.length, 'points');
+
+                if (treePoints.length > 0) {
+                    const heatLayer = L.heatLayer(treePoints, {
+                        radius: 25,
+                        blur: 15,
+                        maxZoom: 17,
+                        minOpacity: 0.6,
+                        gradient: {
+                            0.0: '#228B22',
+                            0.25: '#32CD32',
+                            0.45: '#00FF00',
+                            0.6: '#90EE90',
+                            0.75: '#98FB98',
+                            0.9: '#F0FFF0',
+                            1.0: '#FFFFFF'
+                        }
+                    }).addTo(treesLayer);
+                }
+            } else {
+                // Show legend in actual mode
+                showTreesLegend();
+
+                // Show individual tree markers
+                filteredTrees.forEach(tree => {
+                    if (tree.geometry && tree.geometry.coordinates) {
+                        const coords = tree.geometry.coordinates;
+                        const species = tree.properties.Species || 'Unknown';
+
+                        // Get color for tree species
+                        const speciesKey = species.toLowerCase().replace(/\s+/g, '-');
+                        const color = treeColors[speciesKey] || '#228B22';
+
+                        const treeIcon = L.divIcon({
+                            className: 'tree-marker',
+                            html: `<div style="
+                                background-color: ${color};
+                                width: 10px;
+                                height: 10px;
+                                border-radius: 50%;
+                                border: 2px solid #ffffff;
+                                box-shadow: 0 0 4px rgba(0,0,0,0.5);
+                            "></div>`,
+                            iconSize: [10, 10],
+                            iconAnchor: [5, 5]
+                        });
+
+                        const marker = L.marker([coords[1], coords[0]], { icon: treeIcon })
+                            .bindPopup(`
+                                <strong>${species}</strong><br>
+                                <em>Wrapped Tree</em><br>
+                                <small>Lat: ${coords[1].toFixed(4)}, Lng: ${coords[0].toFixed(4)}</small>
+                            `);
+
+                        marker.addTo(treesLayer);
+                    }
+                });
+            }
+
+            // Update tree count
+            document.getElementById('trees-count').textContent = filteredTrees.length;
+        }
+
+        function showLatestSightings() {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            console.log('Showing black pins for recent SIGHTINGS from past week');
+
+            let markerCount = 0;
+
+            // Show simple black pins for recent SIGHTINGS only
+            allObservations.forEach(obs => {
+                const obsDate = new Date(obs.timestamp);
+                const isRecent = obsDate > oneWeekAgo;
+
+                if (isRecent && obs.latitude && obs.longitude && obs.category === 'Sighting') {
+                    // Simple black pin for sightings
+                    const blackPinIcon = L.divIcon({
+                        className: 'black-pin-sighting',
+                        html: `<div style="
+                            background-color: #000000;
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;
+                            border: 1px solid #ffffff;
+                        "></div>`,
+                        iconSize: [8, 8],
+                        iconAnchor: [4, 4]
+                    });
+
+                    const marker = L.marker([obs.latitude, obs.longitude], { icon: blackPinIcon })
+                        .bindPopup(formatObservationPopup(obs, '<strong>🐘 RECENT SIGHTING (This Week)</strong>'));
+
+                    marker.addTo(observationsLayer);
+                    latestMarkers.push(marker);
+                    markerCount++;
+                }
+            });
+
+            console.log('Total black pins created for recent sightings:', markerCount);
+        }
+
+        function showLatestMaintenance() {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            console.log('Showing black pins for recent MAINTENANCE from past week');
+
+            let markerCount = 0;
+
+            // Show simple black pins for recent MAINTENANCE only
+            allObservations.forEach(obs => {
+                const obsDate = new Date(obs.timestamp);
+                const isRecent = obsDate > oneWeekAgo;
+
+                if (isRecent && obs.latitude && obs.longitude && obs.category === 'Maintenance') {
+                    // Simple black pin for maintenance
+                    const blackPinIcon = L.divIcon({
+                        className: 'black-pin-maintenance',
+                        html: `<div style="
+                            background-color: #000000;
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;
+                            border: 1px solid #ffffff;
+                        "></div>`,
+                        iconSize: [8, 8],
+                        iconAnchor: [4, 4]
+                    });
+
+                    const marker = L.marker([obs.latitude, obs.longitude], { icon: blackPinIcon })
+                        .bindPopup(formatObservationPopup(obs, '<strong>🔧 RECENT MAINTENANCE (This Week)</strong>'));
+
+                    marker.addTo(observationsLayer);
+                    latestMarkers.push(marker);
+                    markerCount++;
+                }
+            });
+
+            console.log('Total black pins created for recent maintenance:', markerCount);
+        }
+
+        function showLatestIncidents() {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            console.log('Showing black pins for recent INCIDENTS from past week');
+
+            let markerCount = 0;
+
+            // Show simple black pins for recent INCIDENTS only
+            allObservations.forEach(obs => {
+                const obsDate = new Date(obs.timestamp);
+                const isRecent = obsDate > oneWeekAgo;
+
+                if (isRecent && obs.latitude && obs.longitude && obs.category === 'Incident') {
+                    // Simple black pin for incidents
+                    const blackPinIcon = L.divIcon({
+                        className: 'black-pin-incident',
+                        html: `<div style="
+                            background-color: #000000;
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;
+                            border: 1px solid #ffffff;
+                        "></div>`,
+                        iconSize: [8, 8],
+                        iconAnchor: [4, 4]
+                    });
+
+                    const marker = L.marker([obs.latitude, obs.longitude], { icon: blackPinIcon })
+                        .bindPopup(formatObservationPopup(obs, '<strong>🚨 RECENT INCIDENT (This Week)</strong>'));
+
+                    marker.addTo(observationsLayer);
+                    latestMarkers.push(marker);
+                    markerCount++;
+                }
+            });
+
+            console.log('Total black pins created for recent incidents:', markerCount);
+        }
+
+        function updateStats(filteredPointCount) {
+            // Use actual data point count (not layer count - hotspot mode has 1 layer but many points)
+            const count = typeof filteredPointCount === 'number' ? filteredPointCount : (observationsLayer.getLayers().length - latestMarkers.length);
+
+            if (currentView === 'sightings') {
+                document.getElementById('total-records').textContent = count;
+            } else if (currentView === 'maintenance') {
+                document.getElementById('maintenance-records').textContent = count;
+            } else if (currentView === 'incidents') {
+                document.getElementById('incident-records').textContent = count;
+            }
+        }
+
+        // Submit water monitoring data
+        async function submitWaterMonitoringData() {
+            const locationSelect = document.getElementById('water-location-select');
+            const locationKey = locationSelect.value;
+
+            if (!locationKey) {
+                alert('Please select a location');
+                return;
+            }
+
+            const location = waterMonitoringLocations[locationKey];
+            if (!location) {
+                alert('Invalid location selected');
+                return;
+            }
+
+            // Collect form data
+            const waterData = {
+                location: locationKey,
+                location_name: location.name,
+                latitude: location.coords[0],
+                longitude: location.coords[1],
+                date: document.getElementById('water-date-input').value,
+                cond: parseFloat(document.getElementById('cond-input').value) || null,
+                tds: parseFloat(document.getElementById('tds-input').value) || null,
+                as: parseFloat(document.getElementById('as-input').value) || null,
+                cr: parseFloat(document.getElementById('cr-input').value) || null,
+                cu: parseFloat(document.getElementById('cu-input').value) || null,
+                mn: parseFloat(document.getElementById('mn-input').value) || null,
+                na: parseFloat(document.getElementById('na-input').value) || null,
+                pb: parseFloat(document.getElementById('pb-input').value) || null
+            };
+
+            // Validate required fields
+            if (!waterData.date) {
+                alert('Please select a date');
+                return;
+            }
+
+            // Check if at least one parameter is provided
+            const hasData = [waterData.cond, waterData.tds, waterData.as, waterData.cr,
+                           waterData.cu, waterData.mn, waterData.na, waterData.pb].some(val => val !== null);
+            if (!hasData) {
+                alert('Please enter at least one water quality parameter');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/water-monitoring`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(waterData)
+                });
+
+                if (!response.ok) throw new Error(`Failed to submit water monitoring data`);
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Water monitoring data submitted successfully!');
+
+                    // Clear form
+                    document.getElementById('water-date-input').value = '';
+                    ['cond-input', 'tds-input', 'as-input', 'cr-input', 'cu-input', 'mn-input', 'na-input', 'pb-input'].forEach(id => {
+                        document.getElementById(id).value = '';
+                    });
+                } else {
+                    throw new Error(result.message || 'Failed to submit data');
+                }
+            } catch (error) {
+                console.error('Error submitting water monitoring data:', error);
+                alert('Failed to submit water monitoring data: ' + error.message);
+            }
+        }
+
+        // Set up all event listeners
+        function setupFilters() {
+            // View mode dropdown
+            document.getElementById('view-mode-select').addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const url = selectedOption.getAttribute('data-url');
+
+                if (url) {
+                    // Navigate to the specified URL
+                    window.location.href = url;
+                    return;
+                }
+
+                currentView = this.value;
+
+                    // Show/hide appropriate controls
+                    document.getElementById('species-group').style.display =
+                        currentView === 'sightings' ? 'block' : 'none';
+                    document.getElementById('trees-group').style.display =
+                        currentView === 'trees' ? 'block' : 'none';
+                    document.getElementById('maintenance-group').style.display =
+                        currentView === 'maintenance' ? 'block' : 'none';
+                    document.getElementById('incidents-group').style.display =
+                        currentView === 'incidents' ? 'block' : 'none';
+                    document.getElementById('water-quality-group').style.display =
+                        currentView === 'water-quality' ? 'block' : 'none';
+                    document.getElementById('water-monitoring-group').style.display =
+                        currentView === 'water-monitoring' ? 'block' : 'none';
+                    document.getElementById('fires-group').style.display =
+                        currentView === 'fires' ? 'block' : 'none';
+                    document.getElementById('vehicle-tracker-group').style.display =
+                        currentView === 'vehicle-tracker' ? 'block' : 'none';
+
+                    // Show/hide date controls for water quality, water monitoring, trees, and vehicle tracker
+                    const allControlGroups = document.querySelectorAll('.control-group');
+
+                    if (currentView === 'water-quality' || currentView === 'water-monitoring' || currentView === 'trees' || currentView === 'vehicle-tracker') {
+                        // Hide date range (index 1) and month/year (index 2) controls for water monitoring and trees
+                        allControlGroups[1].style.display = 'none'; // Date Range
+                        allControlGroups[2].style.display = 'none'; // Month & Year
+                    } else {
+                        // Show date controls for other views
+                        allControlGroups[1].style.display = 'block'; // Date Range
+                        allControlGroups[2].style.display = 'block'; // Month & Year
+                    }
+
+                    // Show/hide species legend for actual locations mode
+                    if (displayMode === 'actual' && currentView === 'sightings') {
+                        showSpeciesLegend();
+                    } else if (currentView === 'trees') {
+                        // Trees legend is handled in displayTrees()
+                    } else if (currentView === 'fires') {
+                        showFiresLegend();
+                    } else if (currentView === 'vehicle-tracker') {
+                        // Vehicle tracker legend is shown in displayVehicleTracks
+                    } else {
+                        hideSpeciesLegend();
+                    }
+
+
+                    // Show water quality markers or Okavango flood layer based on view
+                    if (currentView === 'water-quality') {
+                        hideOkavangoWater();
+                        showWaterMonitoringMarkers();
+                        clearSightingsMarkers();
+                        clearFireMarkers();
+                    } else if (currentView === 'water-monitoring') {
+                        hideWaterMonitoringMarkers();
+                        clearSightingsMarkers();
+                        clearFireMarkers();
+                        loadOkavangoFromFirebase();
+                    } else if (currentView === 'trees') {
+                        hideOkavangoWater();
+                        hideWaterMonitoringMarkers();
+                        clearSightingsMarkers();
+                        clearFireMarkers();
+                        displayTrees();
+                    } else if (currentView === 'fires') {
+                        hideOkavangoWater();
+                        hideWaterMonitoringMarkers();
+                        clearSightingsMarkers();
+                        clearFireMarkers();
+                        clearVehicleTracks();
+                        // Load fire data if not already loaded
+                        if (allFires.length === 0) {
+                            loadFires();
+                        } else {
+                            displayFires();
+                        }
+                    } else if (currentView === 'vehicle-tracker') {
+                        hideOkavangoWater();
+                        hideWaterMonitoringMarkers();
+                        clearSightingsMarkers();
+                        clearFireMarkers();
+                        if (allVehicleTracks.length === 0) {
+                            loadVehicleTracking();
+                        } else {
+                            displayVehicleTracks();
+                        }
+                    } else {
+                        hideOkavangoWater();
+                        hideWaterMonitoringMarkers();
+                        clearSightingsMarkers();
+                        clearFireMarkers();
+                        clearVehicleTracks();
+                        applyFilters();
+                        // Show legend last - clearFireMarkers hides it, so re-show for sightings
+                        if (currentView === 'sightings' && displayMode === 'actual') {
+                            showSpeciesLegend();
+                        }
+                    }
+            });
+
+            // Display mode switch (Hotspots/Actual)
+            document.getElementById('display-mode-toggle').addEventListener('change', function() {
+                displayMode = this.checked ? 'hotspot' : 'actual';
+
+                // Update switch text
+                const switchText = this.parentElement.querySelector('.switch-text');
+                switchText.textContent = this.checked ? 'Hotspots' : 'Actual';
+
+                // Show/hide species legend for actual locations mode
+                if (displayMode === 'actual' && currentView === 'sightings') {
+                    showSpeciesLegend();
+                } else {
+                    hideSpeciesLegend();
+                }
+
+                applyFilters();
+            });
+
+            // Trees display mode switch
+            document.getElementById('trees-display-mode-toggle').addEventListener('change', function() {
+                // Update switch text
+                const switchText = this.parentElement.querySelector('.switch-text');
+                switchText.textContent = this.checked ? 'Hotspots' : 'Actual';
+
+                displayTrees();
+            });
+
+            // Date filters
+            ['start-date', 'end-date', 'month-select', 'year-select'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFilters);
+            });
+
+            // Species filter
+            document.getElementById('species-select').addEventListener('change', applyFilters);
+
+            // Tree filter
+            document.getElementById('tree-select').addEventListener('change', displayTrees);
+
+            // Latest toggles for each category
+            ['latest-sightings-toggle', 'latest-maintenance-toggle', 'latest-incidents-toggle'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyLatestFilters);
+            });
+
+            // Water monitoring location selector
+            document.getElementById('water-location-select').addEventListener('change', function() {
+                const waterParams = document.getElementById('water-params');
+                waterParams.style.display = this.value ? 'block' : 'none';
+            });
+
+            // Water monitoring submit button
+            document.getElementById('submit-water-data').addEventListener('click', submitWaterMonitoringData);
+
+            // Okavango flood controls
+            document.getElementById('okavango-date-slider').addEventListener('input', (e) => {
+                loadOkavangoDateByIndex(parseInt(e.target.value, 10));
+            });
+            document.getElementById('okavango-show-latest').addEventListener('click', async () => {
+                if (okavangoAvailableDates.length > 0) {
+                    const slider = document.getElementById('okavango-date-slider');
+                    slider.value = okavangoAvailableDates.length - 1;
+                    loadOkavangoDateByIndex(okavangoAvailableDates.length - 1);
+                } else {
+                    try {
+                        const res = await fetch(`${OKAVANGO_FIREBASE}/okavango/water/latest.json`);
+                        if (!res.ok) throw new Error(res.statusText);
+                        const data = await res.json();
+                        const geojson = typeof data?.geojson === 'string' ? JSON.parse(data.geojson) : data;
+                        showOkavangoWater(geojson, 'Latest');
+                        document.getElementById('okavango-slider-label').textContent = 'Latest';
+                    } catch (e) {
+                        console.error('Okavango latest load error:', e);
+                    }
+                }
+            });
+
+            // Fire controls
+            document.getElementById('fire-sensor-select').addEventListener('change', displayFires);
+            document.getElementById('fire-days-select').addEventListener('change', () => {
+                // Reload fire data when days change
+                loadFires();
+            });
+            document.getElementById('refresh-fires').addEventListener('click', loadFires);
+            document.getElementById('refresh-vehicle-tracks').addEventListener('click', loadVehicleTracking);
+        }
+
+
+        initMap();
+        setupFilters();
+
+        // When returning to page (e.g. back button / bfcache), ensure legend displays for sightings
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted && typeof map !== 'undefined') {
+                map.invalidateSize();
+                if (currentView === 'sightings' && displayMode === 'actual') {
+                    showSpeciesLegend();
+                } else if (currentView === 'trees') {
+                    displayTrees();
+                } else if (currentView === 'fires') {
+                    showFiresLegend();
+                }
+            }
+        });
+
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="js/portal-app-shell.js"></script>
+    <script>
+      if (window.AuthPortal && window.AuthPortal.waitForFirebase) {
+        window.AuthPortal.waitForFirebase().then(function () {
+          window.wirePortalShellUi({ loginUrl: 'login.html' });
+        });
+      }
+    </script>
+</body>
+</html>

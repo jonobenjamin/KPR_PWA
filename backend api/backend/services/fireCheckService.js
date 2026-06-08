@@ -1,9 +1,7 @@
 /**
- * Fire check service - fetches fire data from FIRMS API and sends notifications.
- * Used by both the /api/fires endpoint (on-demand) and the cron job (scheduled).
+ * Fire check service - fetches fire data from FIRMS API.
+ * Email/push notifications removed (EmailJS retired).
  */
-
-const { sendFireNotifications } = require('./notificationServices');
 
 const BASE_URL = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 const USA_BBOX = '-125,24,-66,49';
@@ -80,17 +78,7 @@ async function fetchFiresAndSendNotifications(days = 3) {
 
   console.log('[FireCheck] Found ' + features.length + ' fires');
 
-  let notificationResults = {};
-
-  if (features.length > 0) {
-    try {
-      notificationResults = await sendFireNotifications(features);
-      console.log('[FireCheck] Notification results:', notificationResults);
-    } catch (err) {
-      console.error('[FireCheck] Notification error:', err);
-      notificationResults = { error: err.message };
-    }
-  }
+  const notificationResults = { skipped: true, reason: 'notifications_disabled' };
 
   return { features, notificationResults };
 }

@@ -2,7 +2,6 @@ const express = require('express');
 const multer = require('multer');
 const admin = require('firebase-admin');
 const { getStorage } = require('firebase-admin/storage');
-const { sendPoachingIncidentNotifications, isPoachingIncident } = require('../services/notificationServices');
 
 const router = express.Router();
 
@@ -545,24 +544,6 @@ router.post('/', optionalBearerUser, upload.single('image'), async (req, res) =>
     const docRef = await db.collection('observations').add(observationData);
 
     console.log('Successfully saved to Firestore with ID:', docRef.id);
-
-    // Send email notification if this is a poaching incident
-    const savedObservation = {
-      id: docRef.id,
-      ...observationData
-    };
-    
-    if (isPoachingIncident(savedObservation)) {
-      console.log('🚨 Poaching incident detected - sending email notification');
-      try {
-        // Wait for email to send before responding (important for serverless functions)
-        const emailResults = await sendPoachingIncidentNotifications(savedObservation);
-        console.log('Email notification sent:', emailResults);
-      } catch (error) {
-        console.error('Email notification failed:', error);
-        // Don't fail the whole request if email fails, just log it
-      }
-    }
 
     res.status(201).json({
       success: true,

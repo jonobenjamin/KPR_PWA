@@ -111,7 +111,7 @@ try {
 }
 
 // Auth routes (factory needs db for Firestore-backed PIN + register)
-app.use(MOREMI_AUTH_MOUNT, require('./api/auth')(db));
+app.use(MOREMI_AUTH_MOUNT, require('./routes/auth')(db));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -125,7 +125,7 @@ app.get('/health', (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Wildlife Tracker Auth Server',
+    message: 'Moremi Auth Server',
     version: '1.0.0',
     endpoints: {
       health: '/health',
@@ -152,7 +152,7 @@ app.use('*', (req, res) => {
 // For local development
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`🚀 Wildlife Tracker Auth Server running on port ${PORT}`);
+    console.log(`Moremi Auth Server on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`📧 PIN requests: POST http://localhost:${PORT}${MOREMI_AUTH_MOUNT}/request-pin`);
     console.log(`✅ PIN verification: POST http://localhost:${PORT}${MOREMI_AUTH_MOUNT}/verify-pin`);

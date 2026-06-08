@@ -1,9 +1,9 @@
 {
-  "name": "kpr-pwa-repo-root",
+  "name": "moremi-pwa-repo-root",
   "private": true,
-  "description": "Vercel builds from repo root; the API is in backend api/backend (see root vercel.json).",
+  "description": "Vercel serverless routes in /api; backend Express routers and npm deps in backend api/backend.",
   "scripts": {
-    "build": "echo \"Root build noop — Vercel bundles backend api/backend/server.js\"",
+    "build": "echo \"Root build noop — Vercel uses api/index.js\"",
     "vercel-build": "echo \"Root vercel-build noop\""
   }
 }

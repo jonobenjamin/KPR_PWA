@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - KPR Monitoring</title>
+    <link rel="icon" type="image/svg+xml" href="data/icons/KPR.svg">
+    <link rel="icon" type="image/png" href="data/icons/KPR_icon.png">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0.25)), url('data/icons/KPR_icon.png') center/cover no-repeat; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; }
+        .login-card { background: white; border-radius: 16px; padding: 40px; max-width: 400px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .login-card h1 { margin: 0 0 8px 0; color: #1a3a1a; font-size: 24px; }
+        .login-card .subtitle { color: #666; margin-bottom: 28px; font-size: 14px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 500; color: #333; margin-bottom: 8px; font-size: 14px; }
+        .form-group input { width: 100%; padding: 14px 16px; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        .form-group input:focus { outline: none; border-color: #2d5a2d; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; background: linear-gradient(135deg, #2d5a2d, #3d7a3d); color: white; margin-top: 8px; }
+        .btn:hover { background: linear-gradient(135deg, #1a3a1a, #2d5a2d); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn.secondary { background: #f0f0f0; color: #333; }
+        .btn.secondary:hover { background: #e0e0e0; }
+        .msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
+        .msg.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .msg.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .forgot-link { display: block; text-align: center; margin-top: 16px; color: #2d5a2d; text-decoration: none; font-size: 14px; cursor: pointer; }
+        .forgot-link:hover { text-decoration: underline; }
+        #pin-step, #forgot-step { display: none; }
+        .pin-hint { font-size: 13px; color: #666; margin-top: 8px; }
+        .loading { display: inline-block; width: 18px; height: 18px; border: 2px solid #f3f3f3; border-top: 2px solid #2d5a2d; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>KPR Monitoring</h1>
+        <p class="subtitle">Sign in to access the dashboard</p>
+
+        <!-- Primary: Email + Password -->
+        <div id="password-step">
+            <form id="password-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Your password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn" id="login-btn">Sign In</button>
+                <a class="forgot-link" id="forgot-link">Forgot password?</a>
+            </form>
+        </div>
+
+        <!-- Forgot: Email PIN flow -->
+        <div id="forgot-step">
+            <form id="email-form">
+                <div class="form-group">
+                    <label for="email-name">Full Name</label>
+                    <input type="text" id="email-name" placeholder="Your full name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="you@example.com" required>
+                </div>
+                <button type="submit" class="btn" id="send-pin-btn">Send PIN Code</button>
+                <button type="button" class="btn secondary" id="back-from-forgot" style="margin-top: 10px;">← Back to password login</button>
+            </form>
+        </div>
+
+        <div id="pin-step">
+            <p class="pin-hint">Enter the 6-digit PIN sent to <strong id="pin-email"></strong></p>
+            <form id="pin-form">
+                <div class="form-group">
+                    <label for="pin">PIN Code</label>
+                    <input type="text" id="pin" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code">
+                </div>
+                <button type="submit" class="btn" id="verify-pin-btn">Verify & Sign In</button>
+                <button type="button" class="btn secondary" id="back-btn" style="margin-top: 10px;">← Back</button>
+            </form>
+        </div>
+
+        <div id="msg" class="msg"></div>
+    </div>
+
+    <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/auth-portal.js"></script>
+    <script>
+        (async function() {
+            await window.AuthPortal.waitForFirebase();
+            const { auth } = window.firebasePortal;
+            const user = await window.AuthPortal.waitForResolvedUser(auth);
+
+            if (user) {
+                const role = await window.AuthPortal.getUserRole(user.uid);
+                if (role) {
+                    window.AuthPortal.redirectByRole(role);
+                    return;
+                }
+            }
+
+            const passwordStep = document.getElementById('password-step');
+            const forgotStep = document.getElementById('forgot-step');
+            const pinStep = document.getElementById('pin-step');
+            const msgEl = document.getElementById('msg');
+            const pinEmailEl = document.getElementById('pin-email');
+
+            function showMsg(text, type) {
+                msgEl.textContent = text;
+                msgEl.className = 'msg ' + type;
+                msgEl.style.display = 'block';
+            }
+
+            function hideMsg() {
+                msgEl.style.display = 'none';
+            }
+
+            let userData = {};
+
+            // Password login
+            document.getElementById('password-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideMsg();
+                const email = document.getElementById('login-email').value.trim().toLowerCase();
+                const password = document.getElementById('password').value;
+                if (!email || !password) {
+                    showMsg('Please fill in all fields', 'error');
+                    return;
+                }
+                const btn = document.getElementById('login-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span>Signing in...';
+                try {
+                    await window.AuthPortal.loginWithPassword(email, password);
+                    const uid = auth.currentUser?.uid;
+                    const role = await window.AuthPortal.getUserRole(uid);
+                    showMsg('Signed in! Redirecting...', 'success');
+                    window.AuthPortal.redirectByRole(role);
+                } catch (err) {
+                    showMsg(err.message || 'Login failed', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In';
+                }
+            });
+
+            // Forgot password -> show email form
+            document.getElementById('forgot-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                hideMsg();
+                passwordStep.style.display = 'none';
+                forgotStep.style.display = 'block';
+            });
+
+            // Back from forgot to password
+            document.getElementById('back-from-forgot').addEventListener('click', () => {
+                hideMsg();
+                forgotStep.style.display = 'none';
+                pinStep.style.display = 'none';
+                passwordStep.style.display = 'block';
+            });
+
+            // Email PIN request
+            document.getElementById('email-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideMsg();
+                const name = document.getElementById('email-name').value.trim();
+                const email = document.getElementById('email').value.trim();
+                if (!name || !email) {
+                    showMsg('Please fill in all fields', 'error');
+                    return;
+                }
+                const btn = document.getElementById('send-pin-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span>Sending...';
+                try {
+                    await window.AuthPortal.requestPin(email, name);
+                    userData = { name, email };
+                    pinEmailEl.textContent = email;
+                    forgotStep.style.display = 'none';
+                    pinStep.style.display = 'block';
+                    document.getElementById('pin').value = '';
+                    document.getElementById('pin').focus();
+                    showMsg('PIN sent! Check your email.', 'success');
+                } catch (err) {
+                    showMsg(err.message || 'Failed to send PIN', 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Send PIN Code';
+                }
+            });
+
+            // PIN verify
+            document.getElementById('pin-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                hideMsg();
+                const pin = document.getElementById('pin').value.trim();
+                if (!pin || pin.length !== 6) {
+                    showMsg('Please enter the 6-digit PIN', 'error');
+                    return;
+                }
+                const btn = document.getElementById('verify-pin-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span>Verifying...';
+                try {
+                    await window.AuthPortal.signInWithPin(userData.email, pin);
+                    const uid = auth.currentUser?.uid;
+                    const role = await window.AuthPortal.getUserRole(uid);
+                    showMsg('Signed in! Redirecting...', 'success');
+                    window.AuthPortal.redirectByRole(role);
+                } catch (err) {
+                    showMsg(err.message || 'Invalid PIN', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Verify & Sign In';
+                }
+            });
+
+            document.getElementById('back-btn').addEventListener('click', () => {
+                pinStep.style.display = 'none';
+                forgotStep.style.display = 'block';
+                hideMsg();
+            });
+
+            document.getElementById('pin').addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '');
+            });
+        })();
+    </script>
+</body>
+</html>

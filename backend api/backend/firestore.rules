@@ -1,0 +1,243 @@
+rules_version = '2';
+// Moremi — observations /read:
+//   • Own docs (user_uid == request.auth.uid): always (full history for profile).
+//   • groupId set & reader in that group: always (group sharing).
+//   • Else: rolling last 7 days only (public map — all users’ recent sightings).
+// Map queries must still use timestamp >= request.time-7d (see observationRetentionLowerBound in Dart).
+// Server (Admin SDK) bypasses these rules; they apply to web/mobile client SDKs.
+// Deploy from this directory: firebase deploy --only firestore
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && 'role'
+          in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+          == 'admin';
+    }
+
+    function groupExists(gid) {
+      return gid is string
+        && gid.size() > 0
+        && exists(/databases/$(database)/documents/groups/$(gid));
+    }
+
+    function inGroup(gid) {
+      return signedIn()
+        && groupExists(gid)
+        && request.auth.uid
+          in get(/databases/$(database)/documents/groups/$(gid)).data.memberIds;
+    }
+
+    /** 7d rolling window (must match client queries + API list policy). */
+    function mapRetentionMillis() {
+      return 604800000;
+    }
+
+    function observationIsSighting() {
+      return resource.data.category == 'Sighting';
+    }
+
+    /** Owner (writes only): existing doc must belong to caller. */
+    function observationOwnedByCaller() {
+      return signedIn()
+        && 'user_uid' in resource.data
+        && resource.data.user_uid == request.auth.uid;
+    }
+
+    /** Public map: any signed-in user — only if Firestore Timestamp and within rolling 7d. */
+    function observationWithinRetentionRead() {
+      return resource.data.timestamp is timestamp
+        && resource.data.timestamp.toMillis()
+          >= request.time.toMillis() - mapRetentionMillis();
+    }
+
+    /** Observation tagged with a group — readable by any member of that group (any age). */
+    function observationReadableByGroupMember() {
+      return 'groupId' in resource.data
+        && resource.data.groupId is string
+        && resource.data.groupId.size() > 0
+        && inGroup(resource.data.groupId);
+    }
+
+    /**
+     * Read: owner always (API may store timestamp as ISO string, not Firestore Timestamp).
+     * Non-owner: Firestore Timestamp only — retention / group branches need .toMillis().
+     */
+    function observationReadable() {
+      return signedIn()
+        && (
+          observationOwnedByCaller()
+          || (
+            resource.data.timestamp is timestamp
+            && (
+              observationReadableByGroupMember()
+              || observationWithinRetentionRead()
+            )
+          )
+        );
+    }
+
+    function validLatLonCreate() {
+      let lat = request.resource.data.latitude;
+      let lon = request.resource.data.longitude;
+      return (lat is int || lat is float)
+        && (lon is int || lon is float)
+        && lat >= -90
+        && lat <= 90
+        && lon >= -180
+        && lon <= 180;
+    }
+
+    function validSightingCountCreate() {
+      let c = request.resource.data.sighting_count;
+      return (c is int && c >= 1 && c <= 999)
+        || (c is float && c >= 1.0 && c <= 999.0);
+    }
+
+    function validSightingObservationCreate() {
+      return request.resource.data.category == 'Sighting'
+        && request.resource.data.animal is string
+        && request.resource.data.animal.size() > 0
+        && request.resource.data.user_uid == request.auth.uid
+        && request.resource.data.timestamp is timestamp
+        && validLatLonCreate()
+        && validSightingCountCreate()
+        && (!('note' in request.resource.data)
+          || request.resource.data.note is string)
+        && (!('emojiAvatar' in request.resource.data)
+          || request.resource.data.emojiAvatar is string)
+        && (!('synced' in request.resource.data)
+          || request.resource.data.synced is bool)
+        && (!('groupId' in request.resource.data)
+          || request.resource.data.groupId == null
+          || (request.resource.data.groupId is string
+            && (request.resource.data.groupId.size() == 0
+              || (groupExists(request.resource.data.groupId)
+                && inGroup(request.resource.data.groupId)))));
+    }
+
+    /** Immutable after create: user_uid, category, timestamp. */
+    function sightingUpdatePreservesImmutable() {
+      return request.resource.data.user_uid == resource.data.user_uid
+        && request.resource.data.category == resource.data.category
+        && request.resource.data.timestamp == resource.data.timestamp;
+    }
+
+    match /observations/{observationId} {
+      allow read: if observationReadable();
+      allow create: if signedIn() && validSightingObservationCreate();
+      allow update: if signedIn()
+        && observationOwnedByCaller()
+        && observationIsSighting()
+        && sightingUpdatePreservesImmutable();
+      allow delete: if signedIn()
+        && observationOwnedByCaller()
+        && observationIsSighting();
+    }
+
+    match /userProfiles/{userId} {
+      allow read: if isSelf(userId);
+      allow create: if isSelf(userId)
+        && request.resource.data.keys().hasOnly([
+          'username', 'avatarEmoji', 'createdAt', 'currentGroupId', 'groupIds',
+        ]);
+      allow update: if isSelf(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['username', 'avatarEmoji', 'currentGroupId', 'lastLogin', 'groupIds']);
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      // Doc id must be Firebase Auth uid. Clients may upsert profile fields but not elevate role/status.
+      allow create: if isSelf(userId)
+        && request.resource.data.uid == userId
+        && (!('role' in request.resource.data) || request.resource.data.role == 'user')
+        && (!('status' in request.resource.data) || request.resource.data.status == 'active');
+      allow update: if isAdmin()
+        || (isSelf(userId)
+          && request.resource.data.uid == resource.data.uid
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']));
+      allow delete: if false;
+    }
+
+    match /groups/{groupId} {
+      allow read: if signedIn()
+        && exists(/databases/$(database)/documents/groups/$(groupId))
+        && request.auth.uid
+          in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.memberIds is list
+        && request.resource.data.memberIds.size() == 1
+        && request.resource.data.memberIds[0] == request.auth.uid
+        && request.resource.data.groupName is string
+        && request.resource.data.inviteCode is string
+        && request.resource.data.inviteCode.size() >= 6;
+      allow update: if signedIn()
+        && groupExists(groupId)
+        && request.auth.uid
+          in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+      allow delete: if false;
+    }
+
+    match /groups/{groupId}/members/{memberUid} {
+      allow read: if inGroup(groupId);
+      allow create: if signedIn()
+        && request.auth.uid == memberUid
+        && inGroup(groupId);
+      allow update: if signedIn()
+        && request.auth.uid == memberUid
+        && inGroup(groupId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['username', 'avatarEmoji']);
+      allow delete: if false;
+    }
+
+    match /groupInvites/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['groupId', 'createdAt'])
+        && request.resource.data.groupId is string
+        && groupExists(request.resource.data.groupId)
+        && get(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.inviteCode
+          == code
+        && get(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.createdBy
+          == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /config/{configId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /user_activity/{activityId} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    match /health/{docId} {
+      allow read: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

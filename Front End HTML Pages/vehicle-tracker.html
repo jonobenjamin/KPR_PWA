@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Tracker - Ecoexist Monitoring Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data/icons/KPR.svg">
+    <link rel="icon" type="image/png" href="data/icons/KPR_icon.png">
+    <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/auth-portal.js"></script>
+    <script>
+      (async function() {
+        try {
+          await window.AuthPortal.checkAuthAndRedirect(false);
+          const user = window.firebasePortal?.auth?.currentUser;
+          if (user) {
+            const role = await window.AuthPortal.getUserRole(user.uid);
+            if (role !== 'admin') window.location.replace('map-users.html');
+          }
+        } catch (e) {
+          window.location.replace('login.html');
+          return;
+        }
+        document.getElementById('auth-overlay')?.remove();
+      })();
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .table-page { padding: 20px; max-width: 1400px; margin: 0 auto; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #3498db; }
+        .table-header h2 { margin: 0; color: #2c3e50; }
+        .table-container { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow-x: auto; }
+        .table-controls { padding: 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+        .table-filters { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .date-control { display: flex; flex-direction: column; }
+        .date-control label { font-size: 12px; color: #6c757d; margin-bottom: 5px; }
+        .date-control select { padding: 8px 12px; border: 2px solid #e1e5e9; border-radius: 6px; font-size: 14px; min-width: 140px; }
+        .btn-primary { background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-primary:hover { background: #2980b9; }
+        .vehicle-table { width: 100%; border-collapse: collapse; }
+        .vehicle-table th, .vehicle-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #dee2e6; }
+        .vehicle-table th { background: #f8f9fa; font-weight: 600; color: #495057; }
+        .vehicle-table tr:hover { background: #f8f9fa; }
+        .vehicle-table .mileage-col { font-weight: 600; color: #3498db; }
+        .pie-cell { min-width: 360px; }
+        .pie-charts-row { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .pie-chart-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .pie-chart-box .pie-label { font-size: 11px; color: #6c757d; font-weight: 600; }
+        .pie-wrapper { position: relative; width: 150px; height: 150px; cursor: pointer; }
+        .loading { text-align: center; padding: 40px; color: #6c757d; }
+    </style>
+</head>
+<body class="app-layout-corridor">
+    <div id="auth-overlay" style="position:fixed;inset:0;background:#fff;z-index:99999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;font-size:18px;color:#333;">Checking authentication...</div>
+
+    <div class="dropdown user-avatar-float">
+        <button type="button" class="user-avatar-btn" id="userAvatarMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu" aria-haspopup="true">
+            <span id="userAvatarInitials">··</span>
+            <span class="user-status-dot" aria-hidden="true"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userAvatarMenuBtn">
+            <li><a class="dropdown-item" href="profile.html" id="userAvatarProfileLink">Profile</a></li>
+            <li><hr class="dropdown-divider" role="presentation"></li>
+            <li><a class="dropdown-item" href="#" id="userAvatarSignOut">Log out</a></li>
+        </ul>
+    </div>
+
+    <aside class="app-sidebar" aria-label="Site navigation">
+        <div class="app-sidebar-brand">
+            <img src="data/icons/KPR.svg" alt="" class="app-sidebar-logo" width="40" height="40">
+            <span class="app-sidebar-title">KPR<br>Monitoring</span>
+        </div>
+        <nav class="app-sidebar-nav">
+            <a href="user-submissions.html" class="app-sidebar-link">Admin Panel</a>
+            <a href="vehicle-tracker.html" class="app-sidebar-link is-active" aria-current="page">Vehicle Tracker</a>
+            <a href="map.html" class="app-sidebar-link">Concession Map</a>
+            <a href="https://jonobenjamin.github.io/KPR_PWA/" target="_blank" rel="noopener noreferrer" class="app-sidebar-link">Submit Data</a>
+        </nav>
+    </aside>
+
+    <div class="app-main-wrap">
+        <header class="app-page-header">
+            <h1 class="app-page-title"><img src="data/icons/KPR.svg" alt="" class="app-page-logo" width="48" height="48">KPR Monitoring — Vehicle Tracker</h1>
+        </header>
+
+    <div class="table-page">
+        <div class="table-header">
+            <h2>Vehicle Tracker</h2>
+        </div>
+
+        <div class="table-controls">
+            <div class="table-filters">
+                <div class="date-control">
+                    <label for="filter-month">Month</label>
+                    <select id="filter-month">
+                        <option value="">All Months</option>
+                        <option value="01">January</option>
+                        <option value="02">February</option>
+                        <option value="03">March</option>
+                        <option value="04">April</option>
+                        <option value="05">May</option>
+                        <option value="06">June</option>
+                        <option value="07">July</option>
+                        <option value="08">August</option>
+                        <option value="09">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+                <div class="date-control">
+                    <label for="filter-year">Year</label>
+                    <select id="filter-year">
+                        <option value="">All Years</option>
+                        <option value="2023">2023</option>
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                        <option value="2027">2027</option>
+                        <option value="2028">2028</option>
+                        <option value="2029">2029</option>
+                        <option value="2030">2030</option>
+                    </select>
+                </div>
+                <button id="refresh-btn" class="btn-primary">Refresh</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="vehicle-table">
+                <thead>
+                    <tr>
+                        <th>Vehicle</th>
+                        <th>Total Trips</th>
+                        <th>Mileage (km)</th>
+                        <th>Total Time</th>
+                        <th>Drivers</th>
+                    </tr>
+                </thead>
+                <tbody id="vehicle-tbody">
+                    <tr><td></td><td></td><td></td><td></td><td></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="bottom-ribbon">
+        <p>© 2025 KPR Monitoring | Developed by <a href="mailto:jonobenjamingis@gmail.com">Fieldwork Africa / @Jonathan Benjamin</a></p>
+    </div>
+    </div><!-- .app-main-wrap -->
+
+    <script>
+        const API_BASE_URL = 'https://moremi-pwa.vercel.app';
+        const API_KEY = '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9';
+
+        function getAuthHeaders() {
+            return { 'x-api-key': API_KEY, 'Content-Type': 'application/json' };
+        }
+
+        let allTracking = [];
+        const PIE_COLORS = ['#3498db', '#27ae60', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
+
+        function getTripDistanceKm(trip) {
+            // App stores distance in meters - convert to km for display
+            if (trip.distanceMeters != null) return trip.distanceMeters / 1000;
+            if (trip.startDistanceKm != null && trip.endDistanceKm != null) {
+                const dist = trip.endDistanceKm - trip.startDistanceKm;
+                return Math.max(0, dist);
+            }
+            return 0;
+        }
+
+        function getTripMonthYear(trip) {
+            const t = trip.startTime || trip.timestamp || trip.endTime;
+            if (!t) return null;
+            const d = new Date(t);
+            return { month: String(d.getMonth() + 1).padStart(2, '0'), year: String(d.getFullYear()) };
+        }
+
+        function formatTotalTime(seconds) {
+            if (seconds == null || seconds === 0) return '-';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
+        function filterByMonthYear(trips, month, year) {
+            if (!month && !year) return trips;
+            return trips.filter(t => {
+                const my = getTripMonthYear(t);
+                if (!my) return false;
+                if (month && my.month !== month) return false;
+                if (year && my.year !== year) return false;
+                return true;
+            });
+        }
+
+        async function loadTracking() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/tracking`, { headers: getAuthHeaders() });
+                if (!res.ok) throw new Error(`API ${res.status}`);
+                const data = await res.json();
+                if (data.success && data.data) {
+                    allTracking = data.data.filter(t => (t.trackingType || '').toLowerCase() === 'vehicle');
+                } else allTracking = [];
+            } catch (e) {
+                console.error('Failed to load tracking:', e);
+                allTracking = [];
+            }
+        }
+
+        function renderTable() {
+            const month = document.getElementById('filter-month').value;
+            const year = document.getElementById('filter-year').value;
+            const filtered = filterByMonthYear(allTracking, month, year);
+
+            const byVehicle = {};
+            filtered.forEach(trip => {
+                const v = (trip.vehicle || 'Unknown').trim() || 'Unknown';
+                if (!byVehicle[v]) {
+                    byVehicle[v] = { vehicle: v, trips: [], totalKm: 0, totalTimeSeconds: 0, byDriver: {} };
+                }
+                const km = getTripDistanceKm(trip);
+                byVehicle[v].trips.push({ ...trip, _km: km });
+                byVehicle[v].totalKm += km;
+                byVehicle[v].totalTimeSeconds += (trip.totalTimeSeconds || 0);
+                const driver = (trip.user || 'Unknown').trim() || 'Unknown';
+                byVehicle[v].byDriver[driver] = (byVehicle[v].byDriver[driver] || 0) + 1;
+            });
+
+            const rows = Object.values(byVehicle).sort((a, b) => (b.totalKm || 0) - (a.totalKm || 0));
+            const tbody = document.getElementById('vehicle-tbody');
+
+            if (rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#6c757d;padding:24px;">No vehicle tracking data for selected period</td></tr>';
+                return;
+            }
+
+            const DRIVER_COLORS = ['#2ecc71', '#e91e63', '#00bcd4', '#ff9800', '#673ab7', '#009688', '#795548', '#607d8b'];
+
+            tbody.innerHTML = rows.map((row, idx) => {
+                const driverChartId = 'chart-driver-' + idx;
+                const driverLabels = Object.keys(row.byDriver);
+
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(row.vehicle)}</strong></td>
+                        <td>${row.trips.length}</td>
+                        <td class="mileage-col">${row.totalKm.toFixed(2)}</td>
+                        <td>${formatTotalTime(row.totalTimeSeconds)}</td>
+                        <td class="pie-cell">
+                            <div class="pie-charts-row">
+                                <div class="pie-chart-box">
+                                    <span class="pie-label">Drivers</span>
+                                    ${driverLabels.length > 0 ? `
+                                        <div class="pie-wrapper">
+                                            <canvas id="${driverChartId}" width="150" height="150"></canvas>
+                                        </div>
+                                    ` : '<span style="color:#999;">No drivers</span>'}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            rows.forEach((row, i) => {
+                const driverChartId = 'chart-driver-' + i;
+                const driverLabels = Object.keys(row.byDriver);
+                const driverValues = driverLabels.map(l => row.byDriver[l]);
+
+                window._vehicleCharts = window._vehicleCharts || {};
+
+                if (driverLabels.length > 0) {
+                    const driverCanvas = document.getElementById(driverChartId);
+                    if (driverCanvas) {
+                        if (window._vehicleCharts[driverChartId]) window._vehicleCharts[driverChartId].destroy();
+                        window._vehicleCharts[driverChartId] = new Chart(driverCanvas.getContext('2d'), {
+                            type: 'pie',
+                            data: {
+                                labels: driverLabels,
+                                datasets: [{
+                                    data: driverValues,
+                                    backgroundColor: DRIVER_COLORS.slice(0, driverLabels.length),
+                                    borderWidth: 1,
+                                    borderColor: '#fff'
+                                }]
+                            },
+                            options: {
+                                responsive: false,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (ctx) => `${ctx.label}: ${ctx.raw} trip(s)`
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
+        }
+
+        function escapeHtml(s) {
+            if (typeof s !== 'string') return '';
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+
+        async function init() {
+            await loadTracking();
+            renderTable();
+        }
+
+        document.getElementById('refresh-btn').addEventListener('click', init);
+        document.getElementById('filter-month').addEventListener('change', renderTable);
+        document.getElementById('filter-year').addEventListener('change', renderTable);
+
+        const now = new Date();
+        document.getElementById('filter-month').value = String(now.getMonth() + 1).padStart(2, '0');
+        document.getElementById('filter-year').value = String(now.getFullYear());
+
+        init();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="js/portal-app-shell.js"></script>
+    <script>
+      if (window.AuthPortal && window.AuthPortal.waitForFirebase) {
+        window.AuthPortal.waitForFirebase().then(function () {
+          window.wirePortalShellUi({ loginUrl: 'login.html' });
+        });
+      }
+    </script>
+</body>
+</html>

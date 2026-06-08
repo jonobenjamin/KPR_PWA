@@ -1,0 +1,135 @@
+{
+  "type": "FeatureCollection",
+  "name": "bots_pois",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Camp Moremi",
+        "category": "accommodation",
+        "type": "Lodge",
+        "link": "https://desertdelta.com/camps/camp-moremi/",
+        "operator": "Desert & Delta"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.409477259791814,
+          -19.189926805829135
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Camp Xakanaxa",
+        "category": "accommodation",
+        "type": "Lodge",
+        "link": "https://desertdelta.com/camps/camp-xakanaxa/",
+        "operator": "Desert & Delta"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.408960731997478,
+          -19.185293268729716
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Xakanaxa Camp Site",
+        "category": "accommodation",
+        "type": "Campsite",
+        "link": "https://www.kwalatesafaris.com/",
+        "operator": "Kwalate Safaries"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.415722555943088,
+          -19.182685013350948
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "South Gate",
+        "category": "accommodation",
+        "type": "Entrance"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.64426418462767,
+          -19.425742544319796
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "South Gate Campsite",
+        "category": "accommodation",
+        "type": "Campsite",
+        "link": "https://www.kwalatesafaris.com/maqwee.html"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.644482667994623,
+          -19.424982748525114
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Third Bridge",
+        "category": "accommodation",
+        "type": "Campsite",
+        "link": "https://www.xomaesites.com/camping/10-third-bridge.html",
+        "operator": "Xomae Group"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.35421280766972,
+          -19.238149492283867
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "North Gate",
+        "category": "accommodation",
+        "type": "Entrance"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.751377902649697,
+          -19.173380482826175
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "North Gate",
+        "category": "accommodation",
+        "type": "Campsite"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.752585761119146,
+          -19.172815101186043
+        ]
+      }
+    }
+  ]
+}

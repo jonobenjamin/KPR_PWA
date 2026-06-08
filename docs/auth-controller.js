@@ -11,6 +11,10 @@ class AuthController {
     // Wait for auth services to be ready
     await this.waitForServices();
     console.log('Auth services ready');
+    if (window.authService && window.authService.ready) {
+      await window.authService.ready;
+      console.log('AuthService initialized (Firebase listeners registered)');
+    }
 
     // Check if we have a previously authenticated user stored locally
     const storedAuth = localStorage.getItem('userAuthenticated');
@@ -19,7 +23,10 @@ class AuthController {
     console.log('DEBUG: storedAuth:', storedAuth, 'storedUserName:', storedUserName);
 
     if (storedAuth === 'true' && storedUserName) {
-      console.log('Found previously authenticated user:', storedUserName, '- starting Flutter directly');
+      console.log('Found previously authenticated user:', storedUserName, '- waiting for Firebase session then starting Flutter');
+      if (window.authService && typeof window.authService.waitForAuthRestore === 'function') {
+        await window.authService.waitForAuthRestore(8000);
+      }
       this.startFlutterApp();
       return;
     }

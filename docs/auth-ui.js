@@ -1,7 +1,9 @@
+import { mlsGetWithLegacy } from './moremi-storage.js';
+
 // Authentication UI
 class AuthUI {
   constructor() {
-    this.currentStep = 'login-type'; // login-type, email-form, email-pin, phone-form, phone-otp
+    this.currentStep = 'password-login'; // default screen is email + password
     this.userData = {};
     this.init();
   }
@@ -18,7 +20,8 @@ class AuthUI {
     container.innerHTML = `
       <div id="auth-container">
         <div id="auth-header">
-          <h2>Sign In to KPR Monitoring</h2>
+          <h2>Moremi Wildlife Sightings</h2>
+          <p class="auth-strapline">Sign in to record sightings</p>
         </div>
         <div id="auth-content"></div>
         <div id="recaptcha-container"></div>
@@ -34,27 +37,37 @@ class AuthUI {
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.8);
+        background: linear-gradient(165deg, #1a2744 0%, #0d1520 55%, #142218 100%);
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 9999;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        padding: 16px; /* Add padding for mobile safe areas */
+        padding: 16px;
         box-sizing: border-box;
       }
 
       #auth-container {
-        background: white;
-        border-radius: 16px; /* More rounded on mobile */
-        padding: 20px;
+        background: #f7f9fc;
+        border-radius: 16px;
+        padding: 0;
         max-width: 400px;
-        width: 100%; /* Full width on mobile */
-        max-height: 90vh; /* Prevent overflow on small screens */
-        overflow-y: auto; /* Allow scrolling if needed */
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow:
+          0 4px 0 #2E7D32,
+          0 24px 48px rgba(0, 0, 0, 0.45);
         animation: slideUp 0.3s ease-out;
-        margin: auto; /* Center properly */
+        margin: auto;
+        border: 1px solid rgba(46, 125, 50, 0.25);
+      }
+
+      #auth-header {
+        padding: 22px 22px 16px;
+        border-bottom: 1px solid rgba(26, 39, 68, 0.12);
+        background: linear-gradient(180deg, #fff 0%, #f8faf8 100%);
+        border-radius: 16px 16px 0 0;
       }
 
       @keyframes slideUp {
@@ -62,19 +75,43 @@ class AuthUI {
         to { transform: translateY(0); opacity: 1; }
       }
 
+      #auth-content {
+        padding: 22px;
+      }
+
       #auth-header h2 {
-        margin: 0 0 24px 0;
-        color: #333;
-        font-size: 22px; /* Slightly smaller for mobile */
-        font-weight: 600;
+        margin: 0 0 6px 0;
+        color: #1a2744;
+        font-size: 1.35rem;
+        font-weight: 700;
         text-align: center;
-        line-height: 1.3;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+
+      .auth-strapline {
+        margin: 0;
+        text-align: center;
+        font-size: 0.9rem;
+        color: #5c6b7a;
+        font-weight: 500;
+      }
+
+      .auth-sub {
+        margin: 0 0 4px 0;
+        font-size: 0.88rem;
+        color: #5c6b7a;
+        line-height: 1.45;
+      }
+
+      #recaptcha-container {
+        padding: 0 22px 22px;
       }
 
       .auth-form {
         display: flex;
         flex-direction: column;
-        gap: 20px; /* More spacing on mobile */
+        gap: 18px;
       }
 
       .form-group {
@@ -84,48 +121,47 @@ class AuthUI {
       }
 
       .form-group label {
-        font-weight: 500;
-        color: #555;
-        font-size: 16px; /* Larger for mobile readability */
-        margin-bottom: 4px;
+        font-weight: 600;
+        color: #37474f;
+        font-size: 15px;
+        margin-bottom: 2px;
       }
 
       .form-group input {
-        padding: 16px 18px; /* Larger touch targets */
-        border: 2px solid #e1e5e9;
-        border-radius: 12px; /* More rounded */
-        font-size: 16px; /* Prevent zoom on iOS */
-        transition: border-color 0.2s;
+        padding: 14px 16px;
+        border: 2px solid #cfd8dc;
+        border-radius: 12px;
+        font-size: 16px;
+        transition: border-color 0.2s, box-shadow 0.2s;
         width: 100%;
         box-sizing: border-box;
-        background: #fafafa; /* Light background for better contrast */
+        background: #fff;
       }
 
       .form-group input:focus {
         outline: none;
-        border-color: #007aff;
-        background: white;
-        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1); /* Focus ring */
+        border-color: #2E7D32;
+        box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.2);
       }
 
       .form-group input::placeholder {
-        color: #999;
+        color: #90a4ae;
         font-size: 16px;
       }
 
       .auth-button {
-        background: linear-gradient(135deg, #007aff, #0056cc); /* Gradient for modern look */
+        background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
         color: white;
         border: none;
-        padding: 16px 20px; /* Larger touch targets */
+        padding: 16px 20px;
         border-radius: 12px;
         font-size: 16px;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: transform 0.15s, filter 0.15s;
         width: 100%;
         box-sizing: border-box;
-        min-height: 48px; /* Minimum touch target size */
+        min-height: 48px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -133,7 +169,7 @@ class AuthUI {
       }
 
       .auth-button:hover {
-        background: linear-gradient(135deg, #0056cc, #004499);
+        filter: brightness(1.06);
         transform: translateY(-1px);
       }
 
@@ -142,77 +178,94 @@ class AuthUI {
       }
 
       .auth-button:disabled {
-        background: #ccc;
+        background: #90a4ae;
         cursor: not-allowed;
         transform: none;
+        filter: none;
       }
 
       .auth-button.secondary {
-        background: #f8f9fa;
-        color: #333;
-        border: 2px solid #e9ecef;
+        background: #fff;
+        color: #1a2744;
+        border: 2px solid #b0bec5;
       }
 
       .auth-button.secondary:hover {
-        background: #e9ecef;
-        border-color: #dee2e6;
+        background: #eceff1;
+        border-color: #90a4ae;
       }
 
       .auth-links {
         display: flex;
         justify-content: center;
-        gap: 24px; /* More spacing */
-        margin-top: 24px;
-        flex-wrap: wrap; /* Wrap on small screens */
+        gap: 16px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .auth-links.auth-links-secondary {
+        margin-top: 12px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(26, 39, 68, 0.1);
+      }
+
+      .auth-links.auth-links-secondary .auth-link {
+        font-size: 14px;
+        font-weight: 600;
+        color: #546e7a;
+      }
+
+      .auth-links.auth-links-secondary .auth-link:hover {
+        color: #1B5E20;
       }
 
       .auth-link {
-        color: #007aff;
+        color: #1B5E20;
         text-decoration: none;
-        font-size: 16px; /* Larger for mobile */
-        font-weight: 500;
+        font-size: 15px;
+        font-weight: 600;
         cursor: pointer;
-        padding: 8px 12px;
+        padding: 8px 10px;
         border-radius: 8px;
         transition: background 0.2s;
-        min-height: 44px; /* Touch target size */
+        min-height: 44px;
         display: flex;
         align-items: center;
       }
 
       .auth-link:hover {
-        background: rgba(0, 122, 255, 0.1);
+        background: rgba(46, 125, 50, 0.12);
         text-decoration: none;
       }
 
       .error-message {
-        color: #dc3545;
-        font-size: 15px; /* Larger for mobile */
-        margin-top: 12px;
+        color: #b71c1c;
+        font-size: 14px;
+        margin-top: 8px;
         text-align: center;
         padding: 12px;
-        background: #f8d7da;
-        border-radius: 8px;
-        border: 1px solid #f5c6cb;
+        background: #ffebee;
+        border-radius: 10px;
+        border: 1px solid #ffcdd2;
       }
 
       .success-message {
-        color: #28a745;
-        font-size: 15px;
-        margin-top: 12px;
+        color: #1B5E20;
+        font-size: 14px;
+        margin-top: 8px;
         text-align: center;
         padding: 12px;
-        background: #d4edda;
-        border-radius: 8px;
-        border: 1px solid #c3e6cb;
+        background: #e8f5e9;
+        border-radius: 10px;
+        border: 1px solid #c8e6c9;
       }
 
       .loading {
         display: inline-block;
         width: 20px;
         height: 20px;
-        border: 3px solid #f3f3f3;
-        border-top: 3px solid #007aff;
+        border: 3px solid rgba(255,255,255,0.35);
+        border-top: 3px solid #fff;
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
@@ -222,57 +275,21 @@ class AuthUI {
         100% { transform: rotate(360deg); }
       }
 
-      /* Mobile-specific adjustments */
       @media (max-width: 480px) {
-        #auth-overlay {
-          padding: 12px;
-        }
-
-        #auth-container {
-          padding: 16px;
-          border-radius: 12px;
-        }
-
-        #auth-header h2 {
-          font-size: 20px;
-          margin-bottom: 20px;
-        }
-
-        .auth-form {
-          gap: 16px;
-        }
-
-        .form-group input {
-          padding: 14px 16px;
-        }
-
-        .auth-button {
-          padding: 14px 18px;
-          min-height: 44px;
-        }
-
-        .auth-links {
-          gap: 16px;
-          margin-top: 20px;
-        }
-
-        .auth-link {
-          font-size: 15px;
-          padding: 6px 10px;
-          min-height: 40px;
-        }
+        #auth-overlay { padding: 12px; }
+        #auth-container { border-radius: 14px; }
+        #auth-header { padding: 18px 16px 14px; border-radius: 14px 14px 0 0; }
+        #auth-content { padding: 18px 16px; }
+        #auth-header h2 { font-size: 1.2rem; }
+        .auth-form { gap: 14px; }
+        .form-group input { padding: 13px 14px; }
+        .auth-button { padding: 14px 18px; min-height: 44px; }
+        .auth-links { gap: 12px; margin-top: 16px; }
       }
 
-      /* Ensure proper viewport handling */
       @media (max-height: 600px) {
-        #auth-container {
-          max-height: 95vh;
-          margin: 8px auto;
-        }
-
-        #auth-overlay {
-          padding: 8px;
-        }
+        #auth-container { max-height: 95vh; margin: 8px auto; }
+        #auth-overlay { padding: 8px; }
       }
     `;
 
@@ -280,19 +297,22 @@ class AuthUI {
     document.body.appendChild(container);
   }
 
+  /** First screen: email + password. PIN/phone are secondary (small links). */
   showLoginTypeSelection() {
-    this.currentStep = 'login-type';
-    const content = document.getElementById('auth-content');
+    this.showPrimaryEmailPasswordScreen();
+  }
 
-    // Check if user has previously authenticated
-    const storedAuth = localStorage.getItem('userAuthenticated');
-    const storedUserName = localStorage.getItem('authenticatedUserName');
+  showPrimaryEmailPasswordScreen() {
+    this.currentStep = 'password-login';
+    const content = document.getElementById('auth-content');
+    const storedAuth = mlsGetWithLegacy('userAuthenticated');
+    const storedUserName = mlsGetWithLegacy('authenticatedUserName');
 
     let offlineButton = '';
     if (storedAuth === 'true' && storedUserName) {
       offlineButton = `
-        <button class="auth-button secondary" onclick="window.authController.startFlutterApp()">
-          🔄 Continue as ${storedUserName} (Offline)
+        <button type="button" class="auth-button secondary" onclick="window.authController.startFlutterApp()">
+          Continue as ${storedUserName} (offline)
         </button>
       `;
     }
@@ -300,14 +320,123 @@ class AuthUI {
     content.innerHTML = `
         <div class="auth-form">
           ${offlineButton}
-          <button class="auth-button" onclick="window.authUI.showEmailForm()">
-            📧 Sign in with Email
+          <div class="form-group">
+            <label for="pwd-email">Email</label>
+            <input type="email" id="pwd-email" placeholder="you@example.com" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="pwd-password">Password</label>
+            <input type="password" id="pwd-password" placeholder="Password" required autocomplete="current-password">
+          </div>
+          <button type="button" class="auth-button" id="password-submit-btn" onclick="window.authUI.handlePasswordSubmit()">
+            Sign in
           </button>
-          <button class="auth-button" onclick="window.authUI.showPhoneForm()">
-            📱 Sign in with Phone
-          </button>
+          <div id="password-message"></div>
+          <p class="auth-sub" style="text-align:center;margin:12px 0 0;">
+            Don&apos;t have an account?
+            <a class="auth-link" onclick="window.authUI.showRegisterForm()" style="display:inline;padding:4px 6px;margin-left:4px;">Create one</a>
+          </p>
+        </div>
+        <p class="auth-sub" style="text-align:center;margin:0;">Other ways to sign in</p>
+        <div class="auth-links auth-links-secondary">
+          <a class="auth-link" onclick="window.authUI.showEmailForm()">Email + one-time PIN</a>
+          <a class="auth-link" onclick="window.authUI.showPhoneForm()">Phone</a>
         </div>
     `;
+    setTimeout(() => {
+      const el = document.getElementById('pwd-email');
+      if (el) el.focus();
+    }, 100);
+  }
+
+  showPasswordLoginForm() {
+    this.showPrimaryEmailPasswordScreen();
+  }
+
+  showRegisterForm() {
+    this.currentStep = 'register';
+    const content = document.getElementById('auth-content');
+    content.innerHTML = `
+      <div class="auth-form">
+        <p class="auth-sub">Create your Moremi account — you&apos;ll sign in with email and password.</p>
+        <div class="form-group">
+          <label for="reg-username">Username</label>
+          <input type="text" id="reg-username" placeholder="Shown in your profile (letters, numbers, . _ -)" required autocomplete="username" maxlength="40">
+        </div>
+        <div class="form-group">
+          <label for="reg-name">Full name</label>
+          <input type="text" id="reg-name" placeholder="Your name" required autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input type="email" id="reg-email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" placeholder="At least 6 characters" required autocomplete="new-password" minlength="6">
+        </div>
+        <div class="form-group">
+          <label for="reg-confirm">Confirm password</label>
+          <input type="password" id="reg-confirm" placeholder="Repeat password" required autocomplete="new-password" minlength="6">
+        </div>
+        <button type="button" class="auth-button" id="register-submit-btn" onclick="window.authUI.handleRegisterSubmit()">
+          Create account
+        </button>
+        <div id="register-message"></div>
+      </div>
+      <div class="auth-links">
+        <a class="auth-link" onclick="window.authUI.showPrimaryEmailPasswordScreen()">← Back to sign in</a>
+      </div>
+    `;
+    setTimeout(() => document.getElementById('reg-username')?.focus(), 100);
+  }
+
+  async handleRegisterSubmit() {
+    const username = document.getElementById('reg-username')?.value.trim() || '';
+    const name = document.getElementById('reg-name')?.value.trim() || '';
+    const email = document.getElementById('reg-email')?.value.trim() || '';
+    const password = document.getElementById('reg-password')?.value || '';
+    const confirm = document.getElementById('reg-confirm')?.value || '';
+
+    if (!username || !name || !email || !password || !confirm) {
+      this.showMessage('register-message', 'Please fill in all fields', 'error');
+      return;
+    }
+    if (username.length < 2) {
+      this.showMessage('register-message', 'Username must be at least 2 characters', 'error');
+      return;
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+      this.showMessage('register-message', 'Username: use letters, numbers, dot, underscore, or hyphen only', 'error');
+      return;
+    }
+    if (!this.isValidEmail(email)) {
+      this.showMessage('register-message', 'Please enter a valid email address', 'error');
+      return;
+    }
+    if (password.length < 6) {
+      this.showMessage('register-message', 'Password must be at least 6 characters', 'error');
+      return;
+    }
+    if (password !== confirm) {
+      this.showMessage('register-message', 'Passwords do not match', 'error');
+      return;
+    }
+
+    this.setLoading('register-submit-btn', true);
+    try {
+      await window.authService.registerWithEmailPassword(email, password, name, null, username);
+      this.showMessage('register-message', 'Account created! Opening app…', 'success');
+      setTimeout(() => this.hideAuthAndStartApp(), 600);
+    } catch (error) {
+      const msg =
+        error && error.message
+          ? error.message
+          : 'Could not create account. Try again or use email + PIN.';
+      this.showMessage('register-message', msg, 'error');
+    } finally {
+      this.setLoading('register-submit-btn', false);
+    }
   }
 
   showEmailForm() {
@@ -315,6 +444,7 @@ class AuthUI {
     const content = document.getElementById('auth-content');
     content.innerHTML = `
       <div class="auth-form">
+        <p class="auth-sub">We’ll email you a one-time PIN (good if you don’t use a password).</p>
         <div class="form-group">
           <label for="name">Full Name</label>
           <input type="text" id="name" placeholder="Enter your full name" required>
@@ -329,7 +459,7 @@ class AuthUI {
         <div id="email-message"></div>
       </div>
       <div class="auth-links">
-        <a class="auth-link" onclick="window.authUI.showLoginTypeSelection()">← Back</a>
+        <a class="auth-link" onclick="window.authUI.showPrimaryEmailPasswordScreen()">← Back to email &amp; password</a>
       </div>
     `;
 
@@ -356,6 +486,7 @@ class AuthUI {
       </div>
       <div class="auth-links">
         <a class="auth-link" onclick="window.authUI.showEmailForm()">← Back</a>
+        <a class="auth-link" onclick="window.authUI.showPrimaryEmailPasswordScreen()">Use email &amp; password instead</a>
         <a class="auth-link" onclick="window.authUI.resendEmailPin()">Resend PIN</a>
       </div>
     `;
@@ -389,11 +520,10 @@ class AuthUI {
         <div id="phone-message"></div>
       </div>
       <div class="auth-links">
-        <a class="auth-link" onclick="window.authUI.showLoginTypeSelection()">← Back</a>
+        <a class="auth-link" onclick="window.authUI.showPrimaryEmailPasswordScreen()">← Back to email &amp; password</a>
       </div>
     `;
 
-    // Focus on name field
     setTimeout(() => document.getElementById('phone-name').focus(), 100);
   }
 
@@ -429,6 +559,39 @@ class AuthUI {
   }
 
   // Event handlers
+  async handlePasswordSubmit() {
+    const email = document.getElementById('pwd-email').value.trim();
+    const password = document.getElementById('pwd-password').value;
+
+    if (!email || !password) {
+      this.showMessage('password-message', 'Please enter email and password', 'error');
+      return;
+    }
+
+    if (!this.isValidEmail(email)) {
+      this.showMessage('password-message', 'Please enter a valid email address', 'error');
+      return;
+    }
+
+    this.setLoading('password-submit-btn', true);
+
+    try {
+      await window.authService.loginWithPassword(email, password);
+      this.showMessage('password-message', 'Sign in successful!', 'success');
+      setTimeout(() => this.hideAuthAndStartApp(), 600);
+    } catch (error) {
+      const msg =
+        error && error.code === 'auth/invalid-credential'
+          ? 'Wrong email or password. Try again or use email + PIN.'
+          : error && error.message
+            ? error.message
+            : 'Sign in failed. Try email + PIN or reset your password in the app profile.';
+      this.showMessage('password-message', msg, 'error');
+    } finally {
+      this.setLoading('password-submit-btn', false);
+    }
+  }
+
   async handleEmailSubmit() {
     const name = document.getElementById('name').value.trim();
     const email = document.getElementById('email').value.trim();
@@ -567,6 +730,10 @@ class AuthUI {
         button.textContent = 'Send OTP';
       } else if (buttonId.includes('otp-submit')) {
         button.textContent = 'Verify Code';
+      } else if (buttonId.includes('password-submit')) {
+        button.textContent = 'Sign in';
+      } else if (buttonId.includes('register-submit')) {
+        button.textContent = 'Create account';
       } else {
         // Fallback: try to restore original text
         const currentText = button.textContent;

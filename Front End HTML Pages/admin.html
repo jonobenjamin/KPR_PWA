@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Khwai Private Reserve Monitoring Dashboard</title>
+
+    <!-- Bootstrap 5 — account avatar dropdown -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Custom styles for admin page -->
+    <style>
+        .table-page {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .table-header h2 {
+            margin: 0;
+            color: #2c3e50;
+        }
+
+
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            width: 100%;
+        }
+
+        #users-table {
+            width: 100%;
+            table-layout: auto;
+        }
+
+        #users-table th,
+        #users-table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            padding: 8px 12px;
+        }
+
+        #users-table th:last-child,
+        #users-table td:last-child {
+            width: 120px;
+            min-width: 120px;
+        }
+
+        .table-controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .table-filters {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .table-stats {
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .submissions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .submissions-table th,
+        .submissions-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .submissions-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .submissions-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .submissions-table .total-column {
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .date-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .date-control {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .date-control label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        /* Admin Panel Styles */
+        .hidden {
+            display: none !important;
+        }
+
+        .login-form {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 50px auto;
+        }
+
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .admin-tab {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+
+        .sortable:hover {
+            background: #e9ecef;
+        }
+
+        .sort-indicator {
+            margin-left: 5px;
+            opacity: 0.5;
+        }
+
+        .sortable.sorted .sort-indicator {
+            opacity: 1;
+        }
+
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.revoked {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Status cell background colors */
+        td:has(.status.active) {
+            background: #d4edda !important;
+        }
+
+        td:has(.status.revoked) {
+            background: #f8d7da !important;
+        }
+    </style>
+</head>
+<body class="app-layout-corridor">
+    <div class="dropdown user-avatar-float">
+        <button type="button" class="user-avatar-btn" id="userAvatarMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu" aria-haspopup="true">
+            <span id="userAvatarInitials">··</span>
+            <span class="user-status-dot" aria-hidden="true"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userAvatarMenuBtn">
+            <li><a class="dropdown-item" href="profile.html" id="userAvatarProfileLink">Profile</a></li>
+            <li><hr class="dropdown-divider" role="presentation"></li>
+            <li><a class="dropdown-item" href="#" id="userAvatarSignOut">Log out</a></li>
+        </ul>
+    </div>
+
+    <aside class="app-sidebar" aria-label="Site navigation">
+        <div class="app-sidebar-brand">
+            <img src="data/icons/KPR.svg" alt="" class="app-sidebar-logo" width="40" height="40">
+            <span class="app-sidebar-title">KPR<br>Monitoring</span>
+        </div>
+        <nav class="app-sidebar-nav">
+            <a href="admin.html" class="app-sidebar-link is-active" aria-current="page">Admin overview</a>
+            <a href="map.html" class="app-sidebar-link">Concession Map</a>
+            <a href="vehicle-tracker.html" class="app-sidebar-link">Vehicle Tracker</a>
+            <a href="user-submissions.html" class="app-sidebar-link">User management</a>
+            <a href="https://jonobenjamin.github.io/KPR_PWA/" target="_blank" rel="noopener noreferrer" class="app-sidebar-link">Submit Data</a>
+        </nav>
+    </aside>
+
+    <div class="app-main-wrap">
+        <header class="app-page-header">
+            <h1 class="app-page-title"><img src="data/icons/KPR.svg" alt="" class="app-page-logo" width="48" height="48">Khwai Private Reserve Monitoring Dashboard — Admin Panel</h1>
+        </header>
+
+    <!-- Login Screen (hidden - using API key auth) -->
+    <div id="login-screen" class="table-page hidden">
+        <div class="login-form">
+            <h2>Admin Access</h2>
+            <p>Admin access granted via API key authentication.</p>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard" class="hidden table-page">
+        <div class="table-header">
+            <h2>Admin Dashboard</h2>
+        </div>
+
+        <div id="dashboard-alert"></div>
+
+        <!-- Admin Stats -->
+        <div class="stats" style="display: flex; gap: 20px; margin-bottom: 30px;">
+            <div class="stat-card" style="flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+                <div class="stat-number" id="admin-total-users">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card" style="flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+                <div class="stat-number" id="admin-active-users">0</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-card" style="flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+                <div class="stat-number" id="admin-revoked-users">0</div>
+                <div class="stat-label">Revoked Users</div>
+            </div>
+        </div>
+
+        <!-- Date Filters -->
+        <div class="table-controls" style="margin-bottom: 20px;">
+            <div class="table-filters">
+                <div class="date-controls">
+                    <div class="date-control">
+                        <label for="start-date">Start Date</label>
+                        <input type="date" id="start-date">
+                    </div>
+                    <div class="date-control">
+                        <label for="end-date">End Date</label>
+                        <input type="date" id="end-date">
+                    </div>
+                    <div class="date-control">
+                        <label for="month-select">Month</label>
+                        <select id="month-select">
+                            <option value="">All Months</option>
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="date-control">
+                        <label for="year-select">Year</label>
+                        <select id="year-select">
+                            <option value="" selected>All Years</option>
+                            <option value="2020">2020</option>
+                            <option value="2021">2021</option>
+                            <option value="2022">2022</option>
+                            <option value="2023">2023</option>
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                            <option value="2029">2029</option>
+                            <option value="2030">2030</option>
+                        </select>
+                    </div>
+                    <button id="refresh-btn" class="btn-primary">Refresh Data</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="name" class="sortable">Name <span class="sort-indicator"></span></th>
+                            <th data-sort="contact" class="sortable">Email/Phone <span class="sort-indicator"></span></th>
+                            <th data-sort="status" class="sortable">Status <span class="sort-indicator"></span></th>
+                            <th data-sort="lastLogin" class="sortable">Last Login <span class="sort-indicator"></span></th>
+                            <th data-sort="sightings" class="sortable">No. Sightings <span class="sort-indicator"></span></th>
+                            <th data-sort="maintenance" class="sortable">No. Maintenance <span class="sort-indicator"></span></th>
+                            <th data-sort="incidents" class="sortable">No. Incidents <span class="sort-indicator"></span></th>
+                            <th data-sort="total" class="sortable sorted">Total Submissions <span class="sort-indicator">↓</span></th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody">
+                        <!-- User data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Ribbon -->
+    <div class="bottom-ribbon">
+        <p>© 2025 Khwai Private Reserve Monitoring System | Developed by <a href="mailto:jonobenjamingis@gmail.com">Fieldwork Africa / @Jonathan Benjamin</a></p>
+    </div>
+    </div><!-- .app-main-wrap -->
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'https://moremi-pwa.vercel.app';
+        const API_KEY = '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9';
+        const ADMIN_API_KEY = 'moremi_admin_2024';
+
+        // Simple authentication function
+        function getAuthHeaders() {
+            return {
+                'x-api-key': API_KEY,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        let allObservations = [];
+
+        // Load observations data
+        async function loadObservations() {
+            try {
+                console.log('Loading observations...');
+                const response = await fetch(`${API_BASE_URL}/api/observations`, {
+                    headers: getAuthHeaders()
+                });
+                if (!response.ok) throw new Error(`Observations API returned ${response.status}`);
+
+                const data = await response.json();
+                console.log('Observations data loaded:', data.data ? data.data.length : 0, 'records');
+
+                if (data.success && data.data) {
+                    allObservations = data.data;
+                    console.log('Data loaded successfully');
+                } else {
+                    console.log('No data received');
+                }
+
+            } catch (error) {
+                console.error('Error loading observations:', error);
+                showError('Failed to load observation data');
+            }
+        }
+
+        // Admin authentication function
+        function getAdminAuthHeaders() {
+            return {
+                'x-api-key': ADMIN_API_KEY,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Calculate submission counts for users
+        async function calculateUserSubmissions(users) {
+            try {
+                // Filter observations to get all submissions (no date filtering for user management)
+                const userStats = {};
+
+                allObservations.forEach(obs => {
+                    const user = obs.user || 'Anonymous';
+                    if (!userStats[user]) {
+                        userStats[user] = {
+                            sightings: 0,
+                            maintenance: 0,
+                            incidents: 0,
+                            total: 0
+                        };
+                    }
+
+                    // Count by category
+                    if (obs.category === 'Sighting') {
+                        userStats[user].sightings++;
+                    } else if (obs.category === 'Maintenance') {
+                        userStats[user].maintenance++;
+                    } else if (obs.category === 'Incident') {
+                        userStats[user].incidents++;
+                    }
+
+                    userStats[user].total++;
+                });
+
+                // Add submission counts to users - try multiple matching strategies
+                return users.map(user => {
+                    // Try to find matching user stats by various identifiers
+                    let userKey = null;
+
+                    // First try exact matches
+                    if (userStats[user.name]) userKey = user.name;
+                    else if (userStats[user.email]) userKey = user.email;
+                    else if (userStats[user.phone]) userKey = user.phone;
+                    else if (userStats[user.uid]) userKey = user.uid;
+                    else if (userStats[user.id]) userKey = user.id;
+                    // Try partial matches for name/email
+                    else {
+                        for (const [key, stats] of Object.entries(userStats)) {
+                            if (user.name && key.toLowerCase().includes(user.name.toLowerCase())) {
+                                userKey = key;
+                                break;
+                            }
+                            if (user.email && key.toLowerCase().includes(user.email.split('@')[0].toLowerCase())) {
+                                userKey = key;
+                                break;
+                            }
+                        }
+                    }
+
+                    return {
+                        ...user,
+                        submissions: userKey ? userStats[userKey] : {
+                            sightings: 0,
+                            maintenance: 0,
+                            incidents: 0,
+                            total: 0
+                        }
+                    };
+                });
+            } catch (error) {
+                console.error('Error calculating user submissions:', error);
+                return users.map(user => ({
+                    ...user,
+                    submissions: {
+                        sightings: 0,
+                        maintenance: 0,
+                        incidents: 0,
+                        total: 0
+                    }
+                }));
+            }
+        }
+
+
+        // Load and display user submissions data
+
+        // Sorting functionality for user management table
+        let userManagementSortColumn = 'total';
+        let userManagementSortDirection = 'desc';
+
+        // Initialize admin page (API key authentication, no login required)
+        async function initAdmin() {
+            showDashboard();
+            await loadUserManagementData();
+        }
+
+        // Show admin dashboard
+        function showDashboard() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('admin-dashboard').classList.remove('hidden');
+        }
+
+
+
+        // Load user management data
+        async function loadUserManagementData() {
+            try {
+                // Ensure observations are loaded first
+                if (!allObservations || allObservations.length === 0) {
+                    console.log('Loading observations for user management...');
+                    await loadObservations();
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+                    headers: getAdminAuthHeaders()
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Calculate submission counts for each user
+                    const usersWithSubmissions = await calculateUserSubmissions(data.users);
+
+                    // Sort users based on current settings
+                    const sortedUsers = sortUsers(usersWithSubmissions);
+
+                    displayUserManagement(sortedUsers);
+                    updateAdminStats(data.stats);
+                } else {
+                    showAlert('dashboard-alert', data.message || 'Failed to load user data', 'danger');
+                }
+            } catch (error) {
+                console.error('Error loading user management data:', error);
+                showAlert('dashboard-alert', 'Failed to load user data', 'danger');
+            }
+        }
+
+        // Display user management table
+        function displayUserManagement(users) {
+            const tbody = document.getElementById('users-tbody');
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>${user.name || 'N/A'}</td>
+                    <td>${user.email || user.phone || 'N/A'}</td>
+                    <td><span class="status ${user.status}">${user.status}</span></td>
+                    <td>${user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</td>
+                    <td>${user.submissions.sightings}</td>
+                    <td>${user.submissions.maintenance}</td>
+                    <td>${user.submissions.incidents}</td>
+                    <td class="total-column">${user.submissions.total}</td>
+                    <td>
+                        ${user.status === 'active' ?
+                            `<button class="btn danger" onclick="revokeUser('${user.uid}')">Revoke</button>` :
+                            `<button class="btn success" onclick="restoreUser('${user.uid}')">Restore</button>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Update admin stats
+        function updateAdminStats(stats) {
+            document.getElementById('admin-total-users').textContent = stats.total || 0;
+            document.getElementById('admin-active-users').textContent = stats.active || 0;
+            document.getElementById('admin-revoked-users').textContent = stats.revoked || 0;
+        }
+
+        // Revoke user
+        async function revokeUser(userId) {
+            if (!confirm('Are you sure you want to revoke this user?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/status`, {
+                    method: 'PATCH',
+                    headers: getAdminAuthHeaders(),
+                    body: JSON.stringify({ status: 'revoked' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    loadUserManagementData();
+                    showAlert('dashboard-alert', 'User access revoked', 'success');
+                } else {
+                    showAlert('dashboard-alert', data.message || 'Failed to revoke user', 'danger');
+                }
+            } catch (error) {
+                console.error('Error revoking user:', error);
+                showAlert('dashboard-alert', 'Failed to revoke user', 'danger');
+            }
+        }
+
+        // Activate user
+        async function restoreUser(userId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/status`, {
+                    method: 'PATCH',
+                    headers: getAdminAuthHeaders(),
+                    body: JSON.stringify({ status: 'active' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    loadUserManagementData();
+                    showAlert('dashboard-alert', 'User access restored', 'success');
+                } else {
+                    showAlert('dashboard-alert', data.message || 'Failed to restore user', 'danger');
+                }
+            } catch (error) {
+                console.error('Error restoring user:', error);
+                showAlert('dashboard-alert', 'Failed to restore user', 'danger');
+            }
+        }
+
+        // Show alert
+        function showAlert(elementId, message, type = 'info') {
+            const alertDiv = document.getElementById(elementId);
+            alertDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            alertDiv.style.display = 'block';
+
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+
+
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 100px;
+                right: 20px;
+                background: #e74c3c;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 5px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                z-index: 1000;
+                max-width: 300px;
+            `;
+            errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+            document.body.appendChild(errorDiv);
+
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 5000);
+        }
+
+        // Set up event listeners
+        document.getElementById('refresh-btn').addEventListener('click', loadUserManagementData);
+
+        // Column sorting for user management table
+        document.querySelectorAll('#users-table th.sortable').forEach(header => {
+            header.addEventListener('click', function() {
+                const sortBy = this.dataset.sort;
+
+                // Toggle sort direction if same column, otherwise set to desc
+                if (userManagementSortColumn === sortBy) {
+                    userManagementSortDirection = userManagementSortDirection === 'desc' ? 'asc' : 'desc';
+                } else {
+                    userManagementSortColumn = sortBy;
+                    userManagementSortDirection = 'desc';
+                }
+
+                // Update sort indicators
+                document.querySelectorAll('#users-table th.sortable').forEach(th => {
+                    th.classList.remove('sorted');
+                    const indicator = th.querySelector('.sort-indicator');
+                    if (indicator) indicator.textContent = '';
+                });
+
+                this.classList.add('sorted');
+                const indicator = this.querySelector('.sort-indicator');
+                if (indicator) {
+                    indicator.textContent = userManagementSortDirection === 'desc' ? '↓' : '↑';
+                }
+
+                // Re-sort and display data
+                sortAndDisplayUserManagement();
+            });
+        });
+
+        // Sort users array based on current settings
+        function sortUsers(users) {
+            return users.sort((a, b) => {
+                let aVal, bVal;
+
+                switch (userManagementSortColumn) {
+                    case 'name':
+                        aVal = (a.name || 'N/A').toLowerCase();
+                        bVal = (b.name || 'N/A').toLowerCase();
+                        break;
+                    case 'contact':
+                        aVal = (a.email || a.phone || 'N/A').toLowerCase();
+                        bVal = (b.email || b.phone || 'N/A').toLowerCase();
+                        break;
+                    case 'status':
+                        aVal = a.status.toLowerCase();
+                        bVal = b.status.toLowerCase();
+                        break;
+                    case 'lastLogin':
+                        aVal = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
+                        bVal = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
+                        break;
+                    case 'sightings':
+                        aVal = a.submissions.sightings;
+                        bVal = b.submissions.sightings;
+                        break;
+                    case 'maintenance':
+                        aVal = a.submissions.maintenance;
+                        bVal = b.submissions.maintenance;
+                        break;
+                    case 'incidents':
+                        aVal = a.submissions.incidents;
+                        bVal = b.submissions.incidents;
+                        break;
+                    case 'total':
+                        aVal = a.submissions.total;
+                        bVal = b.submissions.total;
+                        break;
+                    default:
+                        aVal = (a.name || 'N/A').toLowerCase();
+                        bVal = (b.name || 'N/A').toLowerCase();
+                        break;
+                }
+
+                if (typeof aVal === 'string') {
+                    return userManagementSortDirection === 'desc' ?
+                        bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+                } else {
+                    return userManagementSortDirection === 'desc' ?
+                        bVal - aVal : aVal - bVal;
+                }
+            });
+        }
+
+        // Sort and display user management data
+        function sortAndDisplayUserManagement() {
+            // Get current user data (assuming it's already loaded)
+            // This function should be called after users data is loaded
+            loadUserManagementData();
+        }
+
+        // Sort and display submissions
+
+        // Start the page
+        (async () => {
+            await initAdmin();
+        })();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="js/portal-app-shell.js"></script>
+    <script>
+      window.wirePortalShellUi({ loginUrl: 'login.html', fallbackInitialsLabel: 'ADM' });
+    </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // AUTH HELPERS
+    // =========================
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // =========================
+    // GROUP MEMBERSHIP (SAFE VERSION)
+    // IMPORTANT: no exists()/get() usage
+    // =========================
+    function isGroupMember(groupId) {
+      return signedIn()
+        && request.auth.uid in
+          get(/databases/$(database)/documents/groups/$(groupId))
+          .data.memberIds;
+    }
+
+    // =========================
+    // OBSERVATIONS
+    // =========================
+    match /observations/{observationId} {
+
+      allow read: if signedIn() && (
+        resource.data.user_uid == request.auth.uid
+        || resource.data.category == "Sighting"
+      );
+
+      allow create: if signedIn()
+        && request.resource.data.user_uid == request.auth.uid
+        && request.resource.data.category == "Sighting";
+
+      allow update, delete: if signedIn()
+        && resource.data.user_uid == request.auth.uid;
+    }
+
+    // =========================
+    // USER PROFILES
+    // =========================
+    match /userProfiles/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // =========================
+    // USERS
+    // =========================
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // =========================
+    // GROUPS
+    // Read/list: use resource.data (not get()) so queries like
+    //   .where('memberIds', arrayContains: uid) are permitted.
+    // =========================
+    match /groups/{groupId} {
+
+      allow read: if signedIn()
+        && resource.data.memberIds is list
+        && request.auth.uid in resource.data.memberIds;
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if signedIn()
+        && resource.data.memberIds is list
+        && request.auth.uid in resource.data.memberIds;
+    }
+
+    // =========================
+    // GROUP MEMBERS
+    // FIXED: allow group-wide reads
+    // =========================
+    match /groups/{groupId}/members/{memberId} {
+
+      allow read: if signedIn() && isGroupMember(groupId);
+
+      allow create: if signedIn()
+        && request.auth.uid == memberId;
+
+      allow update, delete: if false;
+    }
+
+    // =========================
+    // GROUP SIGHTINGS
+    // =========================
+    match /groups/{groupId}/sightings/{docId} {
+
+      allow read: if signedIn() && isGroupMember(groupId);
+
+      allow create: if signedIn() && isGroupMember(groupId);
+
+      allow update, delete: if false;
+    }
+
+    // =========================
+    // GROUP INVITES
+    // =========================
+    match /groupInvites/{inviteCode} {
+
+      allow read, write: if signedIn();
+    }
+
+    // =========================
+    // DEFAULT DENY
+    // =========================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

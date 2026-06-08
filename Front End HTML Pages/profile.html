@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - KPR Monitoring</title>
+    <link rel="icon" type="image/svg+xml" href="data/icons/KPR.svg">
+    <link rel="icon" type="image/png" href="data/icons/KPR_icon.png">
+    <script type="module" src="js/firebase-config.js"></script>
+    <script src="js/auth-portal.js"></script>
+    <script>
+      (async function () {
+        await window.AuthPortal.checkAuthAndRedirect(false);
+      })();
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .profile-page { padding: 20px 18px 32px; max-width: 1100px; margin: 0 auto; box-sizing: border-box; width: 100%; }
+        .profile-page h2 { margin: 0 0 8px 0; color: #2c3e50; font-size: 1.35rem; }
+        .profile-meta { color: #666; font-size: 14px; margin-bottom: 24px; }
+        .profile-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .profile-stat { background: #fff; border-radius: 8px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .profile-stat .n { font-size: 1.65rem; font-weight: 700; color: #3498db; }
+        .profile-stat .l { font-size: 12px; color: #6c757d; margin-top: 4px; }
+        .profile-section { background: #fff; border-radius: 8px; padding: 18px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .profile-section h3 { margin: 0 0 12px 0; font-size: 1.05rem; color: #2c3e50; }
+        .profile-table-wrap { overflow-x: auto; }
+        .profile-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .profile-table th, .profile-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .profile-table th { background: #f8f9fa; font-weight: 600; color: #495057; }
+        .profile-map-wrap { position: relative; height: 320px; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6; }
+        #profile-map { width: 100%; height: 100%; }
+        .species-legend-profile {
+            background: rgba(255,255,255,0.95);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.35;
+            max-width: 200px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+        }
+        .species-legend-profile .row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .species-legend-profile .dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #333; flex-shrink: 0; }
+        .pwd-form .form-group { margin-bottom: 14px; }
+        .pwd-form label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 14px; }
+        .pwd-form input { width: 100%; max-width: 320px; padding: 10px 12px; border: 2px solid #e1e5e9; border-radius: 6px; font-size: 15px; box-sizing: border-box; }
+        .pwd-form .btn-submit { background: #3498db; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .pwd-form .btn-submit:hover { background: #2980b9; }
+        .pwd-msg { margin-top: 12px; font-size: 14px; }
+        .pwd-msg.ok { color: #155724; }
+        .pwd-msg.err { color: #721c24; }
+    </style>
+</head>
+<body class="app-layout-corridor">
+    <div class="dropdown user-avatar-float">
+        <button type="button" class="user-avatar-btn" id="userAvatarMenuBtn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Account menu" aria-haspopup="true">
+            <span id="userAvatarInitials">··</span>
+            <span class="user-status-dot" aria-hidden="true"></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="userAvatarMenuBtn">
+            <li><a class="dropdown-item" href="profile.html" id="userAvatarProfileLink">Profile</a></li>
+            <li><hr class="dropdown-divider" role="presentation"></li>
+            <li><a class="dropdown-item" href="#" id="userAvatarSignOut">Log out</a></li>
+        </ul>
+    </div>
+
+    <aside class="app-sidebar" aria-label="Site navigation">
+        <div class="app-sidebar-brand">
+            <img src="data/icons/KPR.svg" alt="" class="app-sidebar-logo" width="40" height="40">
+            <span class="app-sidebar-title">KPR<br>Monitoring</span>
+        </div>
+        <nav class="app-sidebar-nav" id="profile-sidebar-nav"></nav>
+    </aside>
+
+    <div class="app-main-wrap">
+        <header class="app-page-header">
+            <h1 class="app-page-title"><img src="data/icons/KPR.svg" alt="" class="app-page-logo" width="48" height="48">My profile</h1>
+        </header>
+
+        <div class="profile-page">
+            <div id="profile-load" class="loading" style="padding: 40px; text-align: center; color: #666;">Loading your activity…</div>
+            <div id="profile-content" style="display: none;">
+                <h2 id="profile-welcome">Your submissions</h2>
+                <p class="profile-meta" id="profile-sub"></p>
+
+                <div class="profile-stats">
+                    <div class="profile-stat"><span class="n" id="stat-sightings">0</span><div class="l">Sightings</div></div>
+                    <div class="profile-stat"><span class="n" id="stat-maintenance">0</span><div class="l">Maintenance</div></div>
+                    <div class="profile-stat"><span class="n" id="stat-incidents">0</span><div class="l">Incidents</div></div>
+                    <div class="profile-stat"><span class="n" id="stat-total">0</span><div class="l">Total logged</div></div>
+                </div>
+
+                <div class="profile-section">
+                    <h3>Your sightings</h3>
+                    <div class="profile-table-wrap">
+                        <table class="profile-table">
+                            <thead>
+                                <tr><th>Date</th><th>Species</th><th>Activity</th><th>Location</th></tr>
+                            </thead>
+                            <tbody id="sightings-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="profile-section">
+                    <h3>Maintenance &amp; incidents</h3>
+                    <div class="profile-table-wrap">
+                        <table class="profile-table">
+                            <thead>
+                                <tr><th>Date</th><th>Category</th><th>Details</th><th>Location</th></tr>
+                            </thead>
+                            <tbody id="other-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="profile-section">
+                    <h3>Your sightings on the map</h3>
+                    <p style="font-size: 13px; color: #666; margin: 0 0 10px 0;">Concession outline with your animal sightings only. Legend shows species colours.</p>
+                    <div class="profile-map-wrap">
+                        <div id="profile-map"></div>
+                    </div>
+                </div>
+
+                <div class="profile-section">
+                    <h3>Change password</h3>
+                    <p style="font-size: 13px; color: #666; margin: 0 0 14px 0;">Use the same password you use for “Name + password” sign-in. Both fields must match.</p>
+                    <form class="pwd-form" id="pwd-form">
+                        <div class="form-group">
+                            <label for="new-pwd">New password</label>
+                            <input type="password" id="new-pwd" name="newPassword" minlength="6" autocomplete="new-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-pwd">Confirm new password</label>
+                            <input type="password" id="confirm-pwd" name="confirmPassword" minlength="6" autocomplete="new-password" required>
+                        </div>
+                        <button type="submit" class="btn-submit">Update password</button>
+                        <div class="pwd-msg" id="pwd-msg" style="display: none;" role="status"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-ribbon">
+            <p>© 2025 Khwai Private Reserve Monitoring System | Developed by <a href="mailto:jonobenjamingis@gmail.com">@Jonathan Benjamin</a></p>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API_BASE_URL = 'https://moremi-pwa.vercel.app';
+        const API_KEY = '98394a83034f3db48e5acd3ef54bd622c5748ca5bb4fb3ff39c052319711c9a9';
+
+        const speciesColors = {
+            elephant: '#8B4513', lion: '#DC143C', leopard: '#DAA520', buffalo: '#228B22',
+            giraffe: '#FF6347', zebra: '#000000', 'wild-dog': '#8A2BE2', hyena: '#696969',
+            cheetah: '#FFD700', hippo: '#4682B4'
+        };
+
+        function getAuthHeaders() {
+            return { 'x-api-key': API_KEY, 'Content-Type': 'application/json' };
+        }
+
+        function escapeHtml(s) {
+            return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        }
+
+        function observationMatchesProfile(obs, prof) {
+            const u = (obs.user || '').trim();
+            if (!u) return false;
+            const name = (prof.name || '').trim();
+            const email = (prof.email || '').trim();
+            const phone = (prof.phone || '').trim();
+            if (name && u === name) return true;
+            if (email && u.toLowerCase() === email.toLowerCase()) return true;
+            if (phone && u === phone) return true;
+            if (email && u.toLowerCase().includes((email.split('@')[0] || '').toLowerCase())) return true;
+            if (name && u.toLowerCase().includes(name.toLowerCase())) return true;
+            return false;
+        }
+
+        function buildSidebarNav(role) {
+            const el = document.getElementById('profile-sidebar-nav');
+            if (!el) return;
+            if (role === 'admin') {
+                el.innerHTML = ''
+                    + '<a href="map.html" class="app-sidebar-link">Concession Map</a>'
+                    + '<a href="user-submissions.html" class="app-sidebar-link">Admin Panel</a>'
+                    + '<a href="vehicle-tracker.html" class="app-sidebar-link">Vehicle Tracker</a>'
+                    + '<a href="https://jonobenjamin.github.io/KPR_PWA/" target="_blank" rel="noopener noreferrer" class="app-sidebar-link">Submit Data</a>';
+            } else {
+                el.innerHTML = ''
+                    + '<a href="map-users.html" class="app-sidebar-link">Moremi map</a>'
+                    + '<a href="https://jonobenjamin.github.io/KPR_PWA/" target="_blank" rel="noopener noreferrer" class="app-sidebar-link">Submit Data</a>';
+            }
+        }
+
+        function markerColorForAnimal(animal) {
+            const key = (animal || '').toLowerCase().replace(/\s+/g, '-');
+            return speciesColors[key] || '#8B4513';
+        }
+
+        function initProfileMap(sightings) {
+            const map = L.map('profile-map', { zoomControl: true, scrollWheelZoom: true }).setView([-19.0, 23.7], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                maxZoom: 18
+            }).addTo(map);
+
+            const usedSpecies = new Set();
+            var markers = [];
+            sightings.forEach(function (obs) {
+                if (obs.latitude == null || obs.longitude == null) return;
+                var animal = obs.animal || 'Sighting';
+                var col = markerColorForAnimal(animal);
+                usedSpecies.add(animal);
+                var m = L.circleMarker([obs.latitude, obs.longitude], {
+                    radius: 6,
+                    color: '#222',
+                    weight: 1,
+                    fillColor: col,
+                    fillOpacity: 0.9
+                }).bindPopup(
+                    '<strong>' + escapeHtml(animal) + '</strong><br>' +
+                    (obs.activity ? escapeHtml(obs.activity) + '<br>' : '') +
+                    (obs.timestamp ? escapeHtml(new Date(obs.timestamp).toLocaleString()) : '')
+                );
+                m.addTo(map);
+                markers.push(m);
+            });
+
+            fetch('data/geojson/Moremi_boundary.geojson').then(function (r) { return r.json(); }).then(function (geo) {
+                L.geoJSON(geo, {
+                    style: { color: '#2D1810', weight: 2, opacity: 0.85, fillColor: '#DEB887', fillOpacity: 0.15 }
+                }).addTo(map);
+                var boundaryBounds = L.geoJSON(geo).getBounds();
+                if (markers.length) {
+                    var sightBounds = L.featureGroup(markers).getBounds();
+                    if (sightBounds.isValid()) {
+                        map.fitBounds(sightBounds, { padding: [28, 28], maxZoom: 13 });
+                    } else if (boundaryBounds.isValid()) {
+                        map.fitBounds(boundaryBounds, { padding: [16, 16] });
+                    }
+                } else if (boundaryBounds.isValid()) {
+                    map.fitBounds(boundaryBounds, { padding: [16, 16] });
+                }
+            }).catch(function () {
+                if (markers.length) {
+                    var sightBounds = L.featureGroup(markers).getBounds();
+                    if (sightBounds.isValid()) map.fitBounds(sightBounds, { padding: [28, 28], maxZoom: 13 });
+                }
+            });
+
+            var legendHtml = '<div class="species-legend-profile"><strong>Species</strong>';
+            var list = Array.from(usedSpecies).sort();
+            if (!list.length) list = Object.keys(speciesColors);
+            list.forEach(function (sp) {
+                var k = (sp || '').toLowerCase().replace(/\s+/g, '-');
+                var c = speciesColors[k] || '#8B4513';
+                legendHtml += '<div class="row"><span class="dot" style="background:' + c + '"></span><span>' + escapeHtml(sp) + '</span></div>';
+            });
+            legendHtml += '</div>';
+            var leg = L.control({ position: 'topright' });
+            leg.onAdd = function () {
+                var div = L.DomUtil.create('div', '');
+                div.innerHTML = legendHtml;
+                return div;
+            };
+            leg.addTo(map);
+            setTimeout(function () { map.invalidateSize(); }, 300);
+        }
+
+        async function loadProfile() {
+            await window.AuthPortal.waitForFirebase();
+            var fp = window.firebasePortal;
+            var user = fp.auth.currentUser;
+            if (!user) {
+                window.location.replace('login.html');
+                return;
+            }
+
+            var role = await window.AuthPortal.getUserRole(user.uid);
+            if (!role) {
+                await fp.signOut(fp.auth);
+                window.location.replace('login.html');
+                return;
+            }
+            buildSidebarNav(role);
+
+            var snap = await fp.getDoc(fp.doc(fp.db, 'users', user.uid));
+            var prof = snap.exists() ? snap.data() : {};
+            prof.name = prof.name || '';
+            prof.email = prof.email || user.email || '';
+            prof.phone = prof.phone || '';
+
+            document.getElementById('profile-welcome').textContent = (prof.name || 'Your') + ' — activity summary';
+            document.getElementById('profile-sub').textContent =
+                [prof.email, prof.phone].filter(Boolean).join(' · ') || 'Signed in';
+
+            var obsRes = await fetch(API_BASE_URL + '/api/observations', { headers: getAuthHeaders() });
+            var obsJson = await obsRes.json();
+            var all = (obsJson.success && obsJson.data) ? obsJson.data : [];
+            var mine = all.filter(function (o) { return observationMatchesProfile(o, prof); });
+
+            var sightings = mine.filter(function (o) { return o.category === 'Sighting'; });
+            var maintenance = mine.filter(function (o) { return o.category === 'Maintenance'; });
+            var incidents = mine.filter(function (o) { return o.category === 'Incident'; });
+
+            document.getElementById('stat-sightings').textContent = sightings.length;
+            document.getElementById('stat-maintenance').textContent = maintenance.length;
+            document.getElementById('stat-incidents').textContent = incidents.length;
+            document.getElementById('stat-total').textContent = mine.length;
+
+            var sightRows = sightings.slice().sort(function (a, b) {
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            }).slice(0, 150);
+            document.getElementById('sightings-tbody').innerHTML = sightRows.length
+                ? sightRows.map(function (o) {
+                    var loc = (o.latitude != null && o.longitude != null)
+                        ? (Number(o.latitude).toFixed(4) + ', ' + Number(o.longitude).toFixed(4)) : '—';
+                    return '<tr><td>' + escapeHtml(o.timestamp ? new Date(o.timestamp).toLocaleString() : '—') + '</td>'
+                        + '<td>' + escapeHtml(o.animal || '—') + '</td>'
+                        + '<td>' + escapeHtml(o.activity || '—') + '</td>'
+                        + '<td>' + escapeHtml(loc) + '</td></tr>';
+                }).join('')
+                : '<tr><td colspan="4"><em>No sightings recorded yet.</em></td></tr>';
+
+            var other = maintenance.concat(incidents).sort(function (a, b) {
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            }).slice(0, 100);
+            document.getElementById('other-tbody').innerHTML = other.length
+                ? other.map(function (o) {
+                    var loc = (o.latitude != null && o.longitude != null)
+                        ? (Number(o.latitude).toFixed(4) + ', ' + Number(o.longitude).toFixed(4)) : '—';
+                    var det = o.maintenance_type || o.incident_type || o.poaching_type || o.poached_animal || '—';
+                    return '<tr><td>' + escapeHtml(o.timestamp ? new Date(o.timestamp).toLocaleString() : '—') + '</td>'
+                        + '<td>' + escapeHtml(o.category || '—') + '</td>'
+                        + '<td>' + escapeHtml(det) + '</td>'
+                        + '<td>' + escapeHtml(loc) + '</td></tr>';
+                }).join('')
+                : '<tr><td colspan="4"><em>No maintenance or incident reports.</em></td></tr>';
+
+            document.getElementById('profile-load').style.display = 'none';
+            document.getElementById('profile-content').style.display = 'block';
+
+            try {
+                if (sessionStorage.getItem('kpr_return_after_login') === 'profile.html') {
+                    sessionStorage.removeItem('kpr_return_after_login');
+                }
+            } catch (e) { /* noop */ }
+
+            initProfileMap(sightings);
+
+            document.getElementById('pwd-form').addEventListener('submit', async function (ev) {
+                ev.preventDefault();
+                var p1 = document.getElementById('new-pwd').value;
+                var p2 = document.getElementById('confirm-pwd').value;
+                var msg = document.getElementById('pwd-msg');
+                msg.style.display = 'block';
+                if (p1 !== p2) {
+                    msg.className = 'pwd-msg err';
+                    msg.textContent = 'Passwords do not match.';
+                    return;
+                }
+                if (p1.length < 6) {
+                    msg.className = 'pwd-msg err';
+                    msg.textContent = 'Password must be at least 6 characters.';
+                    return;
+                }
+                try {
+                    var token = await user.getIdToken(true);
+                    var res = await fetch(API_BASE_URL + '/api/moremi-auth/change-password', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify({ newPassword: p1, confirmPassword: p2 })
+                    });
+                    var data = await res.json();
+                    if (!res.ok || !data.success) {
+                        msg.className = 'pwd-msg err';
+                        msg.textContent = data.message || 'Could not update password.';
+                        return;
+                    }
+                    msg.className = 'pwd-msg ok';
+                    msg.textContent = 'Password updated successfully.';
+                    document.getElementById('new-pwd').value = '';
+                    document.getElementById('confirm-pwd').value = '';
+                } catch (e) {
+                    msg.className = 'pwd-msg err';
+                    msg.textContent = 'Network error. Try again.';
+                }
+            });
+        }
+
+        loadProfile().catch(function (e) {
+            console.error(e);
+            document.getElementById('profile-load').textContent = 'Could not load profile.';
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="js/portal-app-shell.js"></script>
+    <script>
+      if (window.AuthPortal && window.AuthPortal.waitForFirebase) {
+        window.AuthPortal.waitForFirebase().then(function () {
+          window.wirePortalShellUi({ loginUrl: 'login.html', ribbonSelector: '.app-page-header' });
+        });
+      }
+    </script>
+</body>
+</html>

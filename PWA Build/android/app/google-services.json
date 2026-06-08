@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "478665220534",
+    "project_id": "moremi-app",
+    "storage_bucket": "moremi-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:478665220534:android:9c8fb77504232117ab00001",
+        "android_client_info": {
+          "package_name": "com.moremi.sightings"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4eTkmBRxQ7hNm0zNRuXa1xzqTkeNa4bM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
